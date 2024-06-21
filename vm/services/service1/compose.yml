@@ -1,0 +1,10 @@
+services:
+  notes:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8000"
+    environment:
+      DB_PATH: /data/db.sqlite
+    volumes:
+      - ./data:/data

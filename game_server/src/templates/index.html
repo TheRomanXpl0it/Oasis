@@ -1,0 +1,38 @@
+<!-- index.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>CTF Scoreboard</title>
+	<script src="https://unpkg.com/htmx.org@1.5.0"></script>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+</head>
+<body hx-get="/" hx-trigger="load, every 5s" hx-swap="innerHTML" hx-target="this" hx-indicator="#loading">
+	<div class="container">
+		<h1 class="text-center">CTF Scoreboard</h1>
+		<div class="row">
+			{{ range .Teams }}
+				<div class="col-md-3">
+					<h2>{{ .Team }} - {{ .TotalScore }}</h2>
+					{{ range .Services }}
+						<h4>{{ .Name }} - {{ .Score }}</h4>
+						<table class="table table-striped"> <tr>
+								<th>Flags Stolen/Lost</th>
+								<td id="flags">{{ .StolenFlags }} / {{ .LostFlags }}</td>
+							</tr> <tr>
+								<th>SLA / Up</th>
+								<td id="sla" style="color:{{ .LastTickColor }}">{{ .Sla }} / {{ .LastTick }}</td>
+							</tr> <tr>
+								<th>Ticks Up/Down</th>
+								<td id="ticks">{{ .TicksUp }} / {{ .TicksDown }}</td>
+							</tr>
+						</table>
+					{{ end }}
+				</div>
+			{{ end }}
+		</div>
+	</div>
+</body>
+</html>

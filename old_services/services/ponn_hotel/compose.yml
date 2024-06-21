@@ -1,0 +1,5 @@
+services:
+  ponn_hotel:
+    build: .
+    ports:
+      - 1337:1337

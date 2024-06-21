@@ -1,0 +1,16 @@
+beautifulsoup4==4.12.2
+soupsieve==2.4.1
+pwntools
+pycryptodome
+gornilo
+bs4
+requests
+protobuf==3.14.0
+Flask==1.1.2
+gunicorn==20.0.4
+psycopg2-binary
+numpy
+scipy
+markupsafe==2.0.1
+itsdangerous==1.1.0
+

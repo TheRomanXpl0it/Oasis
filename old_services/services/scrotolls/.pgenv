@@ -1,0 +1,3 @@
+POSTGRES_USER=service
+POSTGRES_PASSWORD=service
+POSTGRES_DB=service

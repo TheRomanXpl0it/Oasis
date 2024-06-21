@@ -1,0 +1,26 @@
+version: "2.2"
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    restart: always
+    depends_on:
+      - postgres
+
+    ulimits:
+      nofile:
+        soft: 12000
+        hard: 12000
+
+  postgres:
+    image: postgres:13.1-alpine
+    restart: always
+    env_file:
+      - .pgenv
+    volumes:
+      - data:/var/lib/postgresql/data/
+
+volumes:
+  data:
