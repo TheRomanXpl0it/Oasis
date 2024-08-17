@@ -2,8 +2,8 @@ FROM golang:1.22
 
 WORKDIR /app/
 
-RUN apt update && \
-	apt install -y python3-pip python3-venv \
+RUN apt-get update && \
+	apt-get install -y python3-pip python3-venv \
 		iproute2 iputils-ping
 
 COPY ./checkers/requirements.txt /tmp/requirements.txt

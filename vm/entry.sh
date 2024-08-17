@@ -1,13 +1,20 @@
 #!/bin/bash
 
-ip link set eth0 down
-ip link set eth0 name game
-ip link set game up
+mv /tmp/services/* /root/
 
+# Set up network
+ip link set eth0 name game
 ip route add 10.10.0.0/24 via 10.60.200.200
 
-find . -maxdepth 1 -mindepth 1 -type d -exec docker compose -f {}/compose.yml up -d \;
+#Wait for docker starts
+while [[ ! $(docker ps) ]]; do
+    sleep 1
+done
 
-/usr/sbin/sshd -D
+# Start sshd
+/usr/sbin/sshd -D &
+
+# Start services
+find /root/ -maxdepth 1 -mindepth 1 -type d -exec docker compose -f {}/compose.yml up -d \; &> /tmp/service-init-logs
 
 tail -f /dev/null
