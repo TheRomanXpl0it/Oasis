@@ -1,6 +1,6 @@
 FROM ubuntu:22.04
 
-RUN apt update && apt install -y socat
+RUN apt-get update && apt-get install -y socat
 
 RUN useradd -d /home/chall/ -m -p chall -s /bin/bash chall
 RUN echo "chall:chall" | chpasswd
