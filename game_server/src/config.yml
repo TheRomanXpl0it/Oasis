@@ -1,5 +1,4 @@
 log_level: "debug"
-log_file: "./server.log"
 
 round_len: 15000 # 120000 == 2 minutes (in milliseconds)
 token: "1111"

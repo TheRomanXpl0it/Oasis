@@ -56,8 +56,6 @@ services:
     volumes:
      - game-server:/app/
     restart: always
-    ports:
-      - 80:80
     networks:
       #scoreboard:
       game_server:

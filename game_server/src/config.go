@@ -10,7 +10,6 @@ import (
 type Config struct {
 	RoundLen   time.Duration
 	LogLevel   string            `yaml:"log_level"`
-	Logfile    string            `yaml:"log_file"`
 	Round      int64             `yaml:"round_len"`
 	Token      string            `yaml:"token"`
 	Nop        string            `yaml:"nop"`

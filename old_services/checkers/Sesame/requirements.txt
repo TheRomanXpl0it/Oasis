@@ -1,3 +1,0 @@
-gornilo
-bs4
-requests
