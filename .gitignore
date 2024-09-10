@@ -1,1 +1,6 @@
 __pycache__/
+oasis-setup-config.json
+compose.yml
+vm-volumes/**
+vm-volumes/
+compose.yml

@@ -9,7 +9,6 @@ RUN apt-get install -y \
 # SSH
 RUN apt-get install -y openssh-server
 RUN mkdir /var/run/sshd
-RUN echo 'root:root' | chpasswd
 RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
 RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
 EXPOSE 22
@@ -19,5 +18,9 @@ WORKDIR /root/
 COPY ./services/ /tmp/services/
 COPY ./entry.sh /tmp/
 RUN chmod +x /tmp/entry.sh
+
+ARG TOKEN
+ENV TOKEN=$TOKEN
+RUN echo "root:${TOKEN:-root}" | chpasswd
 
 CMD ["/tmp/entry.sh"]
