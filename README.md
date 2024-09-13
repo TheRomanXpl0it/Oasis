@@ -47,7 +47,7 @@ To run the services included in the Oasis project:
 Navigate to the appropriate service directory, for example:
 
 ```bash
-cd game_server/checkers
+cd gameserver/checkers
 ```
 
 Execute the service using the provided scripts:

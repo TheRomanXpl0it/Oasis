@@ -6,7 +6,7 @@ parser = argparse.ArgumentParser(description='Oasis setup')
 parser.add_argument('--config', type=str, default='oasis-setup-config.json', help='Path to config file')
 parser.add_argument('--wireguard-start-port', type=int, default=51000, help='Wireguard start port')
 parser.add_argument('--clear', action='store_true', help='Clear all data')
-parser.add_argument('--game-server-log-level', default="debug", help='Log level for game server')
+parser.add_argument('--gameserver-log-level', default="debug", help='Log level for game server')
 
 args = parser.parse_args()
 os.chdir(os.path.abspath(os.path.dirname(__file__)))
@@ -93,6 +93,7 @@ else:
 config = {
     "services": {
         "router": {
+            "hostname": f"router",
             "build": "./router",
             "privileged": "true",
             "cap_add": [
@@ -103,41 +104,50 @@ config = {
                 "net.ipv4.ip_forward=1",
                 "net.ipv4.tcp_timestamps=0"
             ],
+            "environment": {
+                "NTEAM": len(data['teams']),
+            },
             "restart": "unless-stopped",
             "networks": {
-                "vms": {
-                    "ipv4_address": "10.60.200.200"
-                },
-                "game_server": {
-                    "ipv4_address": "10.10.0.200"
+                **{f"vm-team{team['id']}": {
+                    "ipv4_address": f"10.60.{team['id']}.250"
+                } for team in data['teams']},
+                "gameserver": {
+                    "ipv4_address": "10.10.0.250"
                 },
                 **{
                     f"players{team['id']}":{
-                        "ipv4_address": f"10.80.{team['id']}.200"
+                        "ipv4_address": f"10.80.{team['id']}.250"
                     } for team in data['teams'] if not team['nop']
                 }
 
             }
         },
-        "game_server": {
+        "gameserver": {
+            "hostname": f"gameserver",
             "build": "./game_server",
             "cap_add": [
                 "NET_ADMIN"
             ],
             "restart": "always",
             "networks": {
-                "game_server": {
+                "gameserver": {
                     "ipv4_address": "10.10.0.1"
                 }
             }
         },
         **{
             f"team{team['id']}": {
+                "hostname": f"team{team['id']}",
                 "build": {
                     "context": "./vm",
                     "args": {
                         "TOKEN": team['token'],
+                        "TEAM_NAME": team['name'],
                     }
+                },
+                "environment": {
+                    "NTEAM": len(data['teams']),
                 },
                 "privileged": "true",
                 "restart": "unless-stopped",
@@ -145,19 +155,16 @@ config = {
                     f"team{team['id']}-root:/root/"
                 ],
                 "networks": {
-                    "vms": {
+                    f"vm-team{team['id']}": {
                         "ipv4_address": f"10.60.{team['id']}.1"
                     }
-                },
-                "environment": {
-                    "TEAM_ID": team['id'],
-                    "TEAM_NAME": team['name'],
-                },
+                }
                 
             } for team in data['teams']
         },
         **{
             f"wireguard{team['id']}": {
+                "hostname": f"wireguard{team['id']}",
                 "build": "./wireguard",
                 "privileged": "true",
                 "restart": "unless-stopped",
@@ -198,12 +205,12 @@ config = {
             "driver_opts": {
                 "type": "none",
                 "o": "bind",
-                "device": f"./vm-volumes/team{team['id']}-root/"
+                "device": f"./volumes/team{team['id']}-root/"
             }
         } for team in data['teams']
     },
     "networks": {
-        "game_server": {
+        "gameserver": {
             "ipam": {
                 "driver": "default",
                 "config": [
@@ -214,19 +221,21 @@ config = {
                 ]
             }
         },
-        "vms": {
-            "ipam": {
-                "driver": "default",
-                "config": [
-                    {
-                        "subnet": "10.60.0.0/16",
-                        "gateway": "10.60.0.254",
-                    }
-                ]
-            }
+        **{
+            f"vm-team{team['id']}": {
+                "ipam": {
+                    "driver": "default",
+                    "config": [
+                        {
+                            "subnet": f"10.60.{team['id']}.0/24",
+                            "gateway": f"10.60.{team['id']}.254",
+                        }
+                    ]
+                }
+            } for team in data['teams']
         },
         **{
-            "players"+str(team['id']): {
+            f"players{str(team['id'])}": {
                 "ipam": {
                     "driver": "default",
                     "config": [
@@ -242,14 +251,14 @@ config = {
 }
 
 if args.clear:
-    shutil.rmtree("./vm-volumes", ignore_errors=True)
+    shutil.rmtree("./volumes", ignore_errors=True)
     for file in os.listdir("./wireguard"):
         if file.startswith("conf"):
             shutil.rmtree(f"./wireguard/{file}", ignore_errors=True)
 
-try_mkdir("./vm-volumes")
+try_mkdir("./volumes")
 for team in data['teams']:
-    try_mkdir(f"./vm-volumes/team{team['id']}-root")
+    try_mkdir(f"./volumes/team{team['id']}-root")
     if not team['nop']:
         try_mkdir(f"./wireguard/conf{team['id']}")
 
@@ -261,8 +270,8 @@ print('Config saved to compose.yml')
 
 nop_team = data['teams'][0]['id'] if data['enable_nop_team'] else None
 
-game_server_config = {
-    "log_level": args.game_server_log_level,
+gameserver_config = {
+    "log_level": args.gameserver_log_level,
     "round_len": 15000,
     "token": secrets.token_hex(32),
     "nop": f"10.60.{nop_team}.1" if not nop_team is None else "null",
@@ -275,6 +284,7 @@ game_server_config = {
 }
 
 with open('game_server/src/config.yml', 'w') as f:
-    f.write(dict_to_yaml(game_server_config))
+    f.write(dict_to_yaml(gameserver_config))
 
 print('Game server config saved to game_server/src/config.yml')
+print('\nUse: "docker compose exec router ctfroute unlock" to start the ctf!')
