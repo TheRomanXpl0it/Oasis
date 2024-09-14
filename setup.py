@@ -7,6 +7,9 @@ parser.add_argument('--config', type=str, default='oasis-setup-config.json', hel
 parser.add_argument('--wireguard-start-port', type=int, default=51000, help='Wireguard start port')
 parser.add_argument('--clear', action='store_true', help='Clear all data')
 parser.add_argument('--gameserver-log-level', default="debug", help='Log level for game server')
+parser.add_argument('--max-vm-mem', type=str, default="2G", help='Max memory for VMs')
+parser.add_argument('--max-vm-cpus', type=str, default="1", help='Max CPUs for VMs')
+parser.add_argument('--privilaged', action='store_true', help='Use privilaged mode for VMs')
 
 args = parser.parse_args()
 os.chdir(os.path.abspath(os.path.dirname(__file__)))
@@ -86,6 +89,13 @@ else:
     data['wireguard_start_port'] = args.wireguard_start_port
     data['enable_nop_team'] = input('Enable NOP team? (Y/n): ').lower() != 'n'
     data['server_addr'] = input('Server addrerss: ')
+    while True:
+        try:
+            data['tick_time'] = abs(int(input('Tick time (s): ')))
+            break
+        except Exception:
+            print('Invalid tick time')
+            pass
     data['teams'] = generate_teams_array(data)
     with open(args.config, 'w') as f:
         json.dump(data, f, indent=4)
@@ -95,7 +105,7 @@ config = {
         "router": {
             "hostname": f"router",
             "build": "./router",
-            "privileged": "true",
+            **({"privileged": "true"} if args.privilaged else { "runtime": "sysbox-runc" }),
             "cap_add": [
                 "NET_ADMIN",
                 "SYS_MODULE"
@@ -115,6 +125,7 @@ config = {
                 "gameserver": {
                     "ipv4_address": "10.10.0.250"
                 },
+                "externalnet": "",
                 **{
                     f"players{team['id']}":{
                         "ipv4_address": f"10.80.{team['id']}.250"
@@ -146,10 +157,7 @@ config = {
                         "TEAM_NAME": team['name'],
                     }
                 },
-                "environment": {
-                    "NTEAM": len(data['teams']),
-                },
-                "privileged": "true",
+                **({"privileged": "true"} if args.privilaged else { "runtime": "sysbox-runc" }),
                 "restart": "unless-stopped",
                 "volumes": [
                     f"team{team['id']}-root:/root/"
@@ -158,15 +166,22 @@ config = {
                     f"vm-team{team['id']}": {
                         "ipv4_address": f"10.60.{team['id']}.1"
                     }
+                },
+                "deploy":{
+                    "resources":{
+                        "limits":{
+                            "cpus": f'"{args.max_vm_cpus}"',
+                            "memory": args.max_vm_mem
+                        }
+                    }
                 }
-                
             } for team in data['teams']
         },
         **{
             f"wireguard{team['id']}": {
                 "hostname": f"wireguard{team['id']}",
                 "build": "./wireguard",
-                "privileged": "true",
+                **({"privileged": "true"} if args.privilaged else { "runtime": "sysbox-runc" }),
                 "restart": "unless-stopped",
                 "cap_add": [
                     "NET_ADMIN"
@@ -211,6 +226,11 @@ config = {
     },
     "networks": {
         "gameserver": {
+            "internal": "true",
+            "driver": "bridge",
+            "driver_opts": {
+                "com.docker.network.bridge.enable_ip_masquerade": '"false"'
+            },
             "ipam": {
                 "driver": "default",
                 "config": [
@@ -221,8 +241,19 @@ config = {
                 ]
             }
         },
+        "externalnet": {
+            "driver": "bridge",
+            "driver_opts": {
+                "com.docker.network.bridge.enable_icc": '"false"'
+            },
+        },
         **{
             f"vm-team{team['id']}": {
+                "internal": "true",
+                "driver": "bridge",
+                "driver_opts": {
+                    "com.docker.network.bridge.enable_ip_masquerade": '"false"'
+                },
                 "ipam": {
                     "driver": "default",
                     "config": [
@@ -235,7 +266,12 @@ config = {
             } for team in data['teams']
         },
         **{
-            f"players{str(team['id'])}": {
+            f"players{team['id']}": {
+                "internal": "true",
+                "driver": "bridge",
+                "driver_opts": {
+                    "com.docker.network.bridge.enable_ip_masquerade": '"false"'
+                },
                 "ipam": {
                     "driver": "default",
                     "config": [
@@ -272,7 +308,7 @@ nop_team = data['teams'][0]['id'] if data['enable_nop_team'] else None
 
 gameserver_config = {
     "log_level": args.gameserver_log_level,
-    "round_len": 15000,
+    "round_len": data['tick_time']*1000,
     "token": secrets.token_hex(32),
     "nop": f"10.60.{nop_team}.1" if not nop_team is None else "null",
     "teams": {

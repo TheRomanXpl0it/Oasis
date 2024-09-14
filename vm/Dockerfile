@@ -4,7 +4,8 @@ RUN apt-get update
 
 RUN apt-get install -y \
 	iproute2 vim nano tcpdump iputils-ping \
-	python3-pip python3-venv screen netcat-openbsd
+	python3-pip python3-venv screen netcat-openbsd btop htop neovim \
+	nano curl git wget unzip zip traceroute net-tools 
 
 # SSH
 RUN apt-get install -y openssh-server

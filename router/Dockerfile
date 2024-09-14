@@ -1,6 +1,6 @@
 FROM alpine:latest
 
-RUN apk update && apk add iptables iproute2 bash ethtool tcpdump
+RUN apk update && apk add iptables iproute2 bash ethtool tcpdump traceroute
 
 COPY ./entry.sh /entry.sh
 COPY --chown=root:root ./ctfroute.sh /usr/sbin/ctfroute
