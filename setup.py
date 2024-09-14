@@ -105,7 +105,6 @@ config = {
         "router": {
             "hostname": f"router",
             "build": "./router",
-            **({"privileged": "true"} if args.privilaged else { "runtime": "sysbox-runc" }),
             "cap_add": [
                 "NET_ADMIN",
                 "SYS_MODULE"
