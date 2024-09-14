@@ -227,9 +227,6 @@ config = {
         "gameserver": {
             "internal": "true",
             "driver": "bridge",
-            "driver_opts": {
-                "com.docker.network.bridge.enable_ip_masquerade": '"false"'
-            },
             "ipam": {
                 "driver": "default",
                 "config": [
@@ -250,9 +247,6 @@ config = {
             f"vm-team{team['id']}": {
                 "internal": "true",
                 "driver": "bridge",
-                "driver_opts": {
-                    "com.docker.network.bridge.enable_ip_masquerade": '"false"'
-                },
                 "ipam": {
                     "driver": "default",
                     "config": [
@@ -268,9 +262,6 @@ config = {
             f"players{team['id']}": {
                 "internal": "true",
                 "driver": "bridge",
-                "driver_opts": {
-                    "com.docker.network.bridge.enable_ip_masquerade": '"false"'
-                },
                 "ipam": {
                     "driver": "default",
                     "config": [
