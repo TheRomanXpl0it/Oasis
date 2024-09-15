@@ -12,6 +12,7 @@ parser.add_argument('--max-vm-cpus', type=str, default="1", help='Max CPUs for V
 parser.add_argument('--privilaged', action='store_true', help='Use privilaged mode for VMs')
 parser.add_argument('--wireguard-profiles', type=int, default=10, help='Number of wireguard profiles')
 parser.add_argument('--enable-network', action='store_true', help='Enable network')
+parser.add_argument('--dns', type=str, default="1.1.1.1", help='DNS server')
 
 args = parser.parse_args()
 os.chdir(os.path.abspath(os.path.dirname(__file__)))
@@ -106,6 +107,7 @@ config = {
     "services": {
         "router": {
             "hostname": f"router",
+            "dns": [args.dns],
             "build": "./router",
             "cap_add": [
                 "NET_ADMIN",
@@ -143,6 +145,7 @@ config = {
         },
         "gameserver": {
             "hostname": f"gameserver",
+            "dns": [args.dns],
             "build": "./game_server",
             "cap_add": [
                 "NET_ADMIN"
@@ -157,6 +160,7 @@ config = {
         **{
             f"team{team['id']}": {
                 "hostname": f"team{team['id']}",
+                "dns": [args.dns],
                 "build": {
                     "context": "./vm",
                     "args": {
@@ -187,6 +191,7 @@ config = {
         **{
             f"wireguard{team['id']}": {
                 "hostname": f"wireguard{team['id']}",
+                "dns": [args.dns],
                 "build": "./wireguard",
                 "restart": "unless-stopped",
                 "cap_add": [
@@ -212,7 +217,7 @@ config = {
                     "PGID": 1000,
                     "TZ": "Etc/UTC",
                     "PEERS": args.wireguard_profiles,
-                    "PEERDNS": "1.1.1.1",
+                    "PEERDNS": "auto",
                     "ALLOWEDIPS": "10.10.0.0/16, 10.60.0.0/16, 10.80.0.0/16",
                     "SERVERURL": data['server_addr'],
                     "SERVERPORT": data['wireguard_start_port']+team['id'],
@@ -320,4 +325,8 @@ with open('game_server/src/config.yml', 'w') as f:
     f.write(dict_to_yaml(gameserver_config))
 
 print('Game server config saved to game_server/src/config.yml')
+
+if not args.privilaged:
+    print('Please install sysbox! https://github.com/nestybox/sysbox , or use --privilaged flag to use default docker runtime (unsecure)')
+
 print('\nUse: "docker compose exec router ctfroute unlock" to start the ctf!')
