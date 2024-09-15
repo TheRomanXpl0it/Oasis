@@ -11,6 +11,8 @@ ip link set eth0 name game
 ip route del default
 ip route add default via 10.60.$TEAM_ID.250
 
+echo "nameserver 1.1.1.1" > /etc/resolv.conf
+
 # Start sshd
 /usr/sbin/sshd -D &
 

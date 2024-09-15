@@ -18,6 +18,8 @@ iptables -o eth+ -A FORWARD -s 10.0.0.0/8 -d 10.80.0.0/16 -j REJECT
 
 echo "Created rules for $NTEAM teams"
 
+echo "nameserver 1.1.1.1" > /etc/resolv.conf
+
 if [[ "$VM_NET_LOCKED" != "n" ]]; then
     ctfroute lock
 fi

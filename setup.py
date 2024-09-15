@@ -10,6 +10,8 @@ parser.add_argument('--gameserver-log-level', default="debug", help='Log level f
 parser.add_argument('--max-vm-mem', type=str, default="2G", help='Max memory for VMs')
 parser.add_argument('--max-vm-cpus', type=str, default="1", help='Max CPUs for VMs')
 parser.add_argument('--privilaged', action='store_true', help='Use privilaged mode for VMs')
+parser.add_argument('--wireguard-profiles', type=int, default=10, help='Number of wireguard profiles')
+parser.add_argument('--enable-network', action='store_true', help='Enable network')
 
 args = parser.parse_args()
 os.chdir(os.path.abspath(os.path.dirname(__file__)))
@@ -115,18 +117,24 @@ config = {
             ],
             "environment": {
                 "NTEAM": len(data['teams']),
+                "VM_NET_LOCKED": "y" if not args.enable_network else "n",
             },
             "restart": "unless-stopped",
             "networks": {
                 **{f"vm-team{team['id']}": {
+                    "priority": 10,
                     "ipv4_address": f"10.60.{team['id']}.250"
                 } for team in data['teams']},
                 "gameserver": {
+                    "priority": 10,
                     "ipv4_address": "10.10.0.250"
                 },
-                "externalnet": "",
+                "externalnet": {
+                    "priority": 1,
+                },
                 **{
                     f"players{team['id']}":{
+                        "priority": 10,
                         "ipv4_address": f"10.80.{team['id']}.250"
                     } for team in data['teams'] if not team['nop']
                 }
@@ -180,13 +188,13 @@ config = {
             f"wireguard{team['id']}": {
                 "hostname": f"wireguard{team['id']}",
                 "build": "./wireguard",
-                **({"privileged": "true"} if args.privilaged else { "runtime": "sysbox-runc" }),
                 "restart": "unless-stopped",
                 "cap_add": [
                     "NET_ADMIN"
                 ],
                 "sysctls": [
-                    "net.ipv4.conf.all.src_valid_mark=1"
+                    "net.ipv4.conf.all.src_valid_mark=1",
+                    "net.ipv4.ip_forward=1"
                 ],
                 "volumes": [
                     f"./wireguard/conf{team['id']}/:/config/"
@@ -200,12 +208,12 @@ config = {
                     f"{data['wireguard_start_port']+team['id']}:51820/udp"
                 ],
                 "environment": {
-                    "PUID": "1000",
-                    "PGID": "1000",
+                    "PUID": 1000,
+                    "PGID": 1000,
                     "TZ": "Etc/UTC",
-                    "PEERS": "10",
-                    "PEERDNS": "auto",
-                    "ALLOWEDIPS": "10.0.0.0/8",
+                    "PEERS": args.wireguard_profiles,
+                    "PEERDNS": "1.1.1.1",
+                    "ALLOWEDIPS": "10.10.0.0/16, 10.60.0.0/16, 10.80.0.0/16",
                     "SERVERURL": data['server_addr'],
                     "SERVERPORT": data['wireguard_start_port']+team['id'],
                     "INTERNAL_SUBNET": f"10.80.{team['id']}.0/24",
@@ -224,9 +232,15 @@ config = {
         } for team in data['teams']
     },
     "networks": {
+        "externalnet": {
+            "driver": "bridge",
+            "driver_opts": {
+                "com.docker.network.bridge.enable_icc": '"false"'
+            },
+        },
         "gameserver": {
             "internal": "true",
-            "driver": "bridge",
+            "driver": "macvlan",
             "ipam": {
                 "driver": "default",
                 "config": [
@@ -237,16 +251,10 @@ config = {
                 ]
             }
         },
-        "externalnet": {
-            "driver": "bridge",
-            "driver_opts": {
-                "com.docker.network.bridge.enable_icc": '"false"'
-            },
-        },
         **{
             f"vm-team{team['id']}": {
                 "internal": "true",
-                "driver": "bridge",
+                "driver": "macvlan",
                 "ipam": {
                     "driver": "default",
                     "config": [
@@ -260,7 +268,6 @@ config = {
         },
         **{
             f"players{team['id']}": {
-                "internal": "true",
                 "driver": "bridge",
                 "ipam": {
                     "driver": "default",
