@@ -330,3 +330,4 @@ if not args.privilaged:
     print('Please install sysbox! https://github.com/nestybox/sysbox , or use --privilaged flag to use default docker runtime (unsecure)')
 
 print('\nUse: "docker compose exec router ctfroute unlock" to start the ctf!')
+

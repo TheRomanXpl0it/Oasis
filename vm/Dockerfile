@@ -1,5 +1,67 @@
-FROM cruizba/ubuntu-dind:latest
+FROM ubuntu:noble
 
+#
+# Systemd installation
+#
+RUN apt-get update &&                            \
+    apt-get install -y --no-install-recommends   \
+            systemd                              \
+            systemd-sysv                         \
+            libsystemd0                          \
+            ca-certificates                      \
+            dbus                                 \
+            iptables                             \
+            iproute2                             \
+            kmod                                 \
+            locales                              \
+            sudo                                 \
+            udev &&                              \
+                                                 \
+    # Prevents journald from reading kernel messages from /dev/kmsg
+    echo "ReadKMsg=no" >> /etc/systemd/journald.conf &&               \
+                                                                      \
+    # Housekeeping
+    apt-get clean -y &&                                               \
+    rm -rf                                                            \
+       /var/cache/debconf/*                                           \
+       /var/lib/apt/lists/*                                           \
+       /var/log/*                                                     \
+       /tmp/*                                                         \
+       /var/tmp/*                                                     \
+       /usr/share/doc/*                                               \
+       /usr/share/man/*                                               \
+       /usr/share/local/*
+
+# Disable systemd services/units that are unnecessary within a container.
+RUN systemctl mask systemd-udevd.service \
+                   systemd-udevd-kernel.socket \
+                   systemd-udevd-control.socket \
+                   systemd-modules-load.service \
+                   sys-kernel-debug.mount \
+                   sys-kernel-tracing.mount \
+                   sys-kernel-config.mount
+
+# Make use of stopsignal (instead of sigterm) to stop systemd containers.
+STOPSIGNAL SIGRTMIN+3
+
+# Install Docker
+RUN apt-get update && apt-get install -y curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh
+
+ADD https://raw.githubusercontent.com/docker/docker-ce/master/components/cli/contrib/completion/bash/docker /etc/bash_completion.d/docker.sh
+
+# Install Sshd
+RUN apt-get update && apt-get install --no-install-recommends -y openssh-server \
+    && rm -rf /var/lib/apt/lists/*
+
+EXPOSE 22
+
+
+#Set timezone
+RUN ln -fs /usr/share/zoneinfo/Europe/Rome /etc/localtime 
+
+# Install basic tools
 RUN apt-get update
 
 RUN apt-get install -y \
@@ -8,17 +70,19 @@ RUN apt-get install -y \
 	nano curl git wget unzip zip traceroute net-tools 
 
 # SSH
-RUN apt-get install -y openssh-server
 RUN mkdir /var/run/sshd
 RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
 RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
-EXPOSE 22
 
 # Services
 WORKDIR /root/
-COPY ./services/ /tmp/services/
-COPY ./entry.sh /tmp/
-RUN chmod +x /tmp/entry.sh
+COPY ./services/ /services/
+COPY ./entry.sh /usr/bin/_entry_vm_init
+RUN chmod +x /usr/bin/_entry_vm_init
+
+# Create init service
+COPY ./init-vm.service /etc/systemd/system/init-vm.service
+RUN systemctl enable init-vm.service
 
 ARG TOKEN
 ENV TOKEN=$TOKEN
@@ -28,4 +92,4 @@ ARG TEAM_NAME
 ENV TEAM_NAME=$TEAM_NAME
 RUN echo $TEAM_NAME >> /etc/teamname
 
-CMD ["/tmp/entry.sh"]
+ENTRYPOINT [ "/sbin/init", "--log-level=err" ]
