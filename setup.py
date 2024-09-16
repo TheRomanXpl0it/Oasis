@@ -90,8 +90,15 @@ else:
         print(f'Wireguard start port must be less or equal than {args.wireguard_start_port+number_of_teams}')
         exit(1)
     data['wireguard_start_port'] = args.wireguard_start_port
+    data['dns'] = args.dns
+    data['enable_network'] = args.enable_network
+    data['wireguard_profiles'] = args.wireguard_profiles
+    data['docker_privilaged_unsafe'] = args.privilaged
+    data['max_vm_cpus'] = args.max_vm_cpus
+    data['max_vm_mem'] = args.max_vm_mem
+    data['gameserver_log_level'] = args.gameserver_log_level
     data['enable_nop_team'] = input('Enable NOP team? (Y/n): ').lower() != 'n'
-    data['server_addr'] = input('Server addrerss: ')
+    data['server_addr'] = input('Server address: ')
     while True:
         try:
             data['tick_time'] = abs(int(input('Tick time (s): ')))
@@ -107,7 +114,7 @@ config = {
     "services": {
         "router": {
             "hostname": f"router",
-            "dns": [args.dns],
+            "dns": [data['dns']],
             "build": "./router",
             "cap_add": [
                 "NET_ADMIN",
@@ -119,7 +126,7 @@ config = {
             ],
             "environment": {
                 "NTEAM": len(data['teams']),
-                "VM_NET_LOCKED": "y" if not args.enable_network else "n",
+                "VM_NET_LOCKED": "y" if not data['enable_network'] else "n",
             },
             "restart": "unless-stopped",
             "networks": {
@@ -145,7 +152,7 @@ config = {
         },
         "gameserver": {
             "hostname": f"gameserver",
-            "dns": [args.dns],
+            "dns": [data['dns']],
             "build": "./game_server",
             "cap_add": [
                 "NET_ADMIN"
@@ -160,7 +167,7 @@ config = {
         **{
             f"team{team['id']}": {
                 "hostname": f"team{team['id']}",
-                "dns": [args.dns],
+                "dns": [data['dns']],
                 "build": {
                     "context": "./vm",
                     "args": {
@@ -168,7 +175,7 @@ config = {
                         "TEAM_NAME": team['name'],
                     }
                 },
-                **({"privileged": "true"} if args.privilaged else { "runtime": "sysbox-runc" }),
+                **({"privileged": "true"} if data['docker_privilaged_unsafe'] else { "runtime": "sysbox-runc" }),
                 "restart": "unless-stopped",
                 "volumes": [
                     f"team{team['id']}-root:/root/"
@@ -181,8 +188,8 @@ config = {
                 "deploy":{
                     "resources":{
                         "limits":{
-                            "cpus": f'"{args.max_vm_cpus}"',
-                            "memory": args.max_vm_mem
+                            "cpus": f'"{data['max_vm_cpus']}"',
+                            "memory": data['max_vm_mem']
                         }
                     }
                 }
@@ -191,7 +198,7 @@ config = {
         **{
             f"wireguard{team['id']}": {
                 "hostname": f"wireguard{team['id']}",
-                "dns": [args.dns],
+                "dns": [data['dns']],
                 "build": "./wireguard",
                 "restart": "unless-stopped",
                 "cap_add": [
@@ -216,7 +223,7 @@ config = {
                     "PUID": 1000,
                     "PGID": 1000,
                     "TZ": "Etc/UTC",
-                    "PEERS": args.wireguard_profiles,
+                    "PEERS": data['wireguard_profiles'],
                     "PEERDNS": "auto",
                     "ALLOWEDIPS": "10.10.0.0/16, 10.60.0.0/16, 10.80.0.0/16",
                     "SERVERURL": data['server_addr'],
@@ -309,7 +316,7 @@ print('Config saved to compose.yml')
 nop_team = data['teams'][0]['id'] if data['enable_nop_team'] else None
 
 gameserver_config = {
-    "log_level": args.gameserver_log_level,
+    "log_level": data['gameserver_log_level'],
     "round_len": data['tick_time']*1000,
     "token": secrets.token_hex(32),
     "nop": f"10.60.{nop_team}.1" if not nop_team is None else "null",
@@ -326,7 +333,7 @@ with open('game_server/src/config.yml', 'w') as f:
 
 print('Game server config saved to game_server/src/config.yml')
 
-if not args.privilaged:
+if not data['docker_privilaged_unsafe']:
     print('Please install sysbox! https://github.com/nestybox/sysbox , or use --privilaged flag to use default docker runtime (unsecure)')
 
 print('\nUse: "docker compose exec router ctfroute unlock" to start the ctf!')
