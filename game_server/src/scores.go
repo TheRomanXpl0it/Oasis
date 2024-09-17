@@ -38,6 +38,11 @@ type Flags struct {
 	flags map[string]FlagInfo
 }
 
+type SubmissionTimes struct {
+	sync.RWMutex
+	times map[string]time.Time
+}
+
 var (
 	stolenFlags SubmittedFlags // stolenFlags[team][service][flag] = true
 	lostFlags   SubmittedFlags // lostFlags[team][service][flag] = true
@@ -47,6 +52,7 @@ var (
 	sla         Score          // sla[team][service] = sla
 	totalScore  TotalScore     // totalScore[team] = score[team] * sla[team]
 	flags       Flags          // flags[flag] = FlagInfo
+	lastSubmits SubmissionTimes
 )
 
 var scale float64
@@ -131,6 +137,10 @@ func initScoreData() {
 		totalScore.score[team] = initialScore * float64(len(conf.Services))
 	}
 	totalScore.Unlock()
+
+	lastSubmits.Lock()
+	lastSubmits.times = make(map[string]time.Time)
+	lastSubmits.Unlock()
 
 	flags.Lock()
 	flags.flags = make(map[string]FlagInfo)

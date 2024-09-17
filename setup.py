@@ -13,6 +13,7 @@ parser.add_argument('--privilaged', action='store_true', help='Use privilaged mo
 parser.add_argument('--wireguard-profiles', type=int, default=10, help='Number of wireguard profiles')
 parser.add_argument('--enable-network', action='store_true', help='Enable network')
 parser.add_argument('--dns', type=str, default="1.1.1.1", help='DNS server')
+parser.add_argument('--submission-timeout', type=int, default=10, help='Submission timeout rate limit')
 
 args = parser.parse_args()
 os.chdir(os.path.abspath(os.path.dirname(__file__)))
@@ -99,6 +100,7 @@ else:
     data['gameserver_log_level'] = args.gameserver_log_level
     data['enable_nop_team'] = input('Enable NOP team? (Y/n): ').lower() != 'n'
     data['server_addr'] = input('Server address: ')
+    data['submission_timeout'] = args.submission_timeout
     while True:
         try:
             data['tick_time'] = abs(int(input('Tick time (s): ')))
@@ -320,6 +322,7 @@ gameserver_config = {
     "round_len": data['tick_time']*1000,
     "token": secrets.token_hex(32),
     "nop": f"10.60.{nop_team}.1" if not nop_team is None else "null",
+    "submitter_limit": data['submission_timeout']*1000,
     "teams": {
         f"10.60.{team['id']}.1": team['token'] for team in data['teams']
     },

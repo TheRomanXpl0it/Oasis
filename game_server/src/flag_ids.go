@@ -69,7 +69,12 @@ func submitFlagID(w http.ResponseWriter, r *http.Request) {
 	if len(flagIDs.ids[sub.ServiceID][team]) > 4 {
 		flagIDs.ids[sub.ServiceID][team] = flagIDs.ids[sub.ServiceID][team][1:]
 	}
-	flagIDs.ids[sub.ServiceID][team] = append(flagIDs.ids[sub.ServiceID][team], sub.FlagID)
+	var finalFlagId interface{}
+	err := json.Unmarshal([]byte(sub.FlagID), &finalFlagId)
+	if err != nil {
+		finalFlagId = sub.FlagID
+	}
+	flagIDs.ids[sub.ServiceID][team] = append(flagIDs.ids[sub.ServiceID][team], finalFlagId)
 	flagIDs.Unlock()
 	log.Debugf("Received flag_id %v from %v:%v (%v) in round %v",
 		sub.FlagID, sub.TeamID, team, sub.ServiceID, sub.Round)
