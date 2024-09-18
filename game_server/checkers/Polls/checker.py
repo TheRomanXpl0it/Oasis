@@ -217,8 +217,7 @@ def put_flag():
 
     #'''
     try:
-        checklib.post_flag_id(service_name, team_addr, json.dumps(
-            {"poll_id": poll_id, "username": user}))
+        checklib.post_flag_id(service_name, team_addr, {"poll_id": poll_id, "username": user})
     except Exception as e:
         checklib.quit(checklib.Status.ERROR, "Checker error", str(e))
     #'''

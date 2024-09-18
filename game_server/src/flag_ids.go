@@ -9,11 +9,11 @@ import (
 )
 
 type FlagIDSub struct {
-	Token     string `json:"token"`
-	ServiceID string `json:"serviceId"`
-	TeamID    string `json:"teamId"`
-	Round     int    `json:"round"`
-	FlagID    string `json:"flagId"`
+	Token     string      `json:"token"`
+	ServiceID string      `json:"serviceId"`
+	TeamID    string      `json:"teamId"`
+	Round     int         `json:"round"`
+	FlagID    interface{} `json:"flagId"`
 }
 
 type FlagIDs struct {
@@ -69,12 +69,8 @@ func submitFlagID(w http.ResponseWriter, r *http.Request) {
 	if len(flagIDs.ids[sub.ServiceID][team]) > 4 {
 		flagIDs.ids[sub.ServiceID][team] = flagIDs.ids[sub.ServiceID][team][1:]
 	}
-	var finalFlagId interface{}
-	err := json.Unmarshal([]byte(sub.FlagID), &finalFlagId)
-	if err != nil {
-		finalFlagId = sub.FlagID
-	}
-	flagIDs.ids[sub.ServiceID][team] = append(flagIDs.ids[sub.ServiceID][team], finalFlagId)
+
+	flagIDs.ids[sub.ServiceID][team] = append(flagIDs.ids[sub.ServiceID][team], sub.FlagID)
 	flagIDs.Unlock()
 	log.Debugf("Received flag_id %v from %v:%v (%v) in round %v",
 		sub.FlagID, sub.TeamID, team, sub.ServiceID, sub.Round)
