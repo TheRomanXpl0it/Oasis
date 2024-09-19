@@ -28,16 +28,46 @@ git clone https://github.com/yourusername/Oasis.git
 cd Oasis
 ```
 
-Install the necessary dependencies:
+Install sysbox (you need to use a fixed version of sysbox in this repository until the official release will be released and the issue will be fixed):
+
+📦 [Sysbox .deb files here (for x86 and arm64)](sysbox-fix)
+
+If you can't install sysbox you can still run Oasis but using privileged docker mode, that is not recommended for security reasons.
+
+Create compose.yml file:
 
 ```bash
-pip install -r requirements.txt
+python3 setup.py
 ```
 
-Configure the services and infrastructure as needed, using the provided compose.yml file:
+if you want to use privileged mode, you can use the following command:
 
 ```bash
-docker-compose up -d
+#UNSAFE, DON'T SHARE VMs WITH UNTRUSTED USERS
+python3 setup.py --privileged
+```
+
+Build the Docker containers:
+
+```bash
+docker compose up -d --build
+```
+
+To connect to the VMs, you need to use one of the wireguard configurations in the wireguard folder.
+
+Instead you can run `docker compose exec team<team_id> bash` to connect to the VMs.
+
+To manage the game network run:
+
+```bash 
+docker compose exec router ctfroute unlock|lock
+```
+
+To stop the services run:
+
+```bash
+docker compose down
+py setup.py --clean # Only if you want remove all the volumes and configs
 ```
 
 ## Usage
@@ -47,7 +77,7 @@ To run the services included in the Oasis project:
 Navigate to the appropriate service directory, for example:
 
 ```bash
-cd game_server/checkers
+cd gameserver/checkers
 ```
 
 Execute the service using the provided scripts:

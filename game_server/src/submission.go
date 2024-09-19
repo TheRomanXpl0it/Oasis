@@ -15,6 +15,23 @@ type SubResp struct {
 	Status bool   `json:"status"`
 }
 
+func Values[M ~map[K]V, K comparable, V any](m M) []V {
+	r := make([]V, 0, len(m))
+	for _, v := range m {
+		r = append(r, v)
+	}
+	return r
+}
+
+func Contains[T comparable](s []T, e T) bool {
+	for _, v := range s {
+		if v == e {
+			return true
+		}
+	}
+	return false
+}
+
 const maxFlags = 2000
 
 func elaborateFlag(team string, flag string, resp *SubResp) {
@@ -86,18 +103,22 @@ func elaborateFlags(team string, submittedFlags []string) []SubResp {
 
 func submitFlags(w http.ResponseWriter, r *http.Request) {
 	team := r.Header.Get("X-Team-Token")
-	if team == "" {
+	if team == "" || !Contains(Values(conf.Teams), team) || team == conf.Teams[conf.Nop] {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	// TODO: rate limit
-	/*
-		make a "next request" per teamToken, like:
-		// next := time.Now().Add(5 * time.Second)
-		then after token verification:
-		// if next.After(time.Now()) { RateLimit }
-	*/
+	if conf.SubmitterLimit != nil {
+		lastSubmits.RLock()
+		if last, ok := lastSubmits.times[team]; ok && time.Now().Before(last.Add(time.Duration((*conf.SubmitterLimit)*int64(time.Millisecond)))) {
+			lastSubmits.RUnlock()
+			log.Infof("Submission limit reached for team %s", team)
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		lastSubmits.times[team] = time.Now()
+		lastSubmits.RUnlock()
+	}
 
 	var submittedFlags []string
 	dec := json.NewDecoder(r.Body)

@@ -14,11 +14,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
-
-	if conf.Logfile != "" {
-		log.SetLogFile(conf.Logfile)
-		defer log.CloseLogFile()
-	}
 	log.SetLogLevel(conf.LogLevel)
 	log.Debugf("Config: %+v\n", conf)
 

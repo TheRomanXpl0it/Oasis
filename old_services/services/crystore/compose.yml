@@ -1,8 +1,0 @@
-version: "3"
-services:
-  cry_store:
-    build: .
-    volumes:
-      - ./data:/service/data
-    ports: 
-      - "9122:9122" 

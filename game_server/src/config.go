@@ -8,15 +8,15 @@ import (
 )
 
 type Config struct {
-	RoundLen   time.Duration
-	LogLevel   string            `yaml:"log_level"`
-	Logfile    string            `yaml:"log_file"`
-	Round      int64             `yaml:"round_len"`
-	Token      string            `yaml:"token"`
-	Nop        string            `yaml:"nop"`
-	Teams      map[string]string `yaml:"teams"`
-	Services   []string          `yaml:"services"`
-	CheckerDir string            `yaml:"checker_dir"`
+	RoundLen       time.Duration
+	LogLevel       string            `yaml:"log_level"`
+	Round          int64             `yaml:"round_len"`
+	Token          string            `yaml:"token"`
+	Nop            string            `yaml:"nop"`
+	Teams          map[string]string `yaml:"teams"`
+	Services       []string          `yaml:"services"`
+	CheckerDir     string            `yaml:"checker_dir"`
+	SubmitterLimit *int64            `yaml:"submitter_limit,omitempty"`
 }
 
 var conf *Config

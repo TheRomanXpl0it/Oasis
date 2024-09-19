@@ -1,7 +1,5 @@
 #!/bin/bash
-
-ip route add 10.60.0.0/16 via 10.10.0.200
-
+ip route add default via 10.10.0.250
 echo "127.0.0.1 flagid" >> /etc/hosts
 
-tail -f /dev/null
+go run .

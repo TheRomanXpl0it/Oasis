@@ -3,7 +3,6 @@ package log
 import (
 	"os"
 	"strings"
-	"syscall"
 
 	"github.com/op/go-logging"
 )
@@ -52,20 +51,6 @@ func init() {
 
 	backends = append(backends, backendLeveled)
 	logging.SetBackend(backends...)
-}
-
-func SetLogFile(file string) {
-	var err error
-
-	logFile, err = os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
-	if err != nil {
-		panic(err)
-	}
-
-	err = syscall.Dup2(int(logFile.Fd()), int(os.Stderr.Fd()))
-	if err != nil {
-		panic(err)
-	}
 
 	filebackend := logging.NewLogBackend(os.Stderr, "", 0)
 	filebackendFormatter := logging.NewBackendFormatter(filebackend, fileFormat)
