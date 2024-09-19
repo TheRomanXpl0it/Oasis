@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"game/db"
 	"game/log"
 	"net/http"
-	"sync"
+	"time"
 )
 
 type FlagIDSub struct {
@@ -16,24 +18,8 @@ type FlagIDSub struct {
 	FlagID    interface{} `json:"flagId"`
 }
 
-type FlagIDs struct {
-	sync.RWMutex
-	ids map[string]map[string][]interface{}
-}
-
-var flagIDs FlagIDs // flagIDs[service][team] = []flagID
-
-func initFlagIDs() {
-	flagIDs.ids = make(map[string]map[string][]interface{})
-	for _, service := range conf.Services {
-		flagIDs.ids[service] = make(map[string][]interface{})
-		for team := range conf.Teams {
-			flagIDs.ids[service][team] = make([]interface{}, 0)
-		}
-	}
-}
-
 func submitFlagID(w http.ResponseWriter, r *http.Request) {
+	var ctx context.Context = context.Background()
 	jsonDecoder := json.NewDecoder(r.Body)
 	var sub FlagIDSub
 	if err := jsonDecoder.Decode(&sub); err != nil {
@@ -48,15 +34,6 @@ func submitFlagID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	flagIDs.RLock()
-	if _, ok := flagIDs.ids[sub.ServiceID]; !ok {
-		http.Error(w, "Invalid service", http.StatusBadRequest)
-		log.Errorf("Error: invalid service in flag_id submission: %+v", sub)
-		flagIDs.RUnlock()
-		return
-	}
-	flagIDs.RUnlock()
-
 	var team string
 	_, ok := conf.Teams[sub.TeamID]
 	if !ok {
@@ -65,18 +42,25 @@ func submitFlagID(w http.ResponseWriter, r *http.Request) {
 		team = sub.TeamID
 	}
 
-	flagIDs.Lock()
-	if len(flagIDs.ids[sub.ServiceID][team]) > 4 {
-		flagIDs.ids[sub.ServiceID][team] = flagIDs.ids[sub.ServiceID][team][1:]
+	var associatedFlag = new(db.Flag)
+	if err := conn.NewSelect().Model(associatedFlag).Where("team = ? and round = ? and service = ?", team, sub.Round, sub.ServiceID).Scan(ctx); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		log.Errorf("Error: invalid flag_id submission: %v", err)
+		return
 	}
 
-	flagIDs.ids[sub.ServiceID][team] = append(flagIDs.ids[sub.ServiceID][team], sub.FlagID)
-	flagIDs.Unlock()
+	if _, err := conn.NewUpdate().Model(associatedFlag).Set("external_flag_id = ?", sub.FlagID).WherePK().Exec(ctx); err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Criticalf("Error updating flag_id: %v", err)
+		return
+	}
+
 	log.Debugf("Received flag_id %v from %v:%v (%v) in round %v",
 		sub.FlagID, sub.TeamID, team, sub.ServiceID, sub.Round)
 }
 
 func retriveFlagIDs(w http.ResponseWriter, r *http.Request) {
+	var ctx context.Context = context.Background()
 	query := r.URL.Query()
 
 	enc := json.NewEncoder(w)
@@ -114,44 +98,42 @@ func retriveFlagIDs(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-
-	flagIDs.RLock()
-	defer flagIDs.RUnlock()
-
+	validFlags := make([]db.Flag, 0)
+	var err error = nil
 	if !ok_service && !ok_team {
-		if err := enc.Encode(flagIDs.ids); err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			log.Errorf("Error encoding flag_ids: %v", err)
-			return
-		}
-
+		err = conn.NewSelect().Model(&validFlags).Where("now() - created_at < interval '? milliseconds'", int64(conf.FlagExpireTime)/int64(time.Millisecond)).Scan(ctx)
 	} else if !ok_service {
-		teamIDs := make(map[string][]interface{})
-		for service, serviceIDs := range flagIDs.ids {
-			teamIDs[service] = serviceIDs[team[0]]
-		}
-		if err := enc.Encode(teamIDs); err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			log.Errorf("Error encoding flag_ids: %v", err)
-			return
-		}
-
+		err = conn.NewSelect().Model(&validFlags).Where("team = ? and (now() - created_at < interval '? milliseconds')", team[0], int64(conf.FlagExpireTime)/int64(time.Millisecond)).Scan(ctx)
 	} else if !ok_team {
-		serviceIDs := flagIDs.ids[services[0]]
-		if err := enc.Encode(serviceIDs); err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			log.Errorf("Error encoding flag_ids: %v", err)
-			return
-		}
-
+		err = conn.NewSelect().Model(&validFlags).Where("service = ? and (now() - created_at) < interval '? milliseconds'", services[0], int64(conf.FlagExpireTime)/int64(time.Millisecond)).Scan(ctx)
 	} else {
-		serviceIDs := flagIDs.ids[services[0]]
-		teamIDs := serviceIDs[team[0]]
-		if err := enc.Encode(teamIDs); err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			log.Errorf("Error encoding flag_ids: %v", err)
-			return
+		err = conn.NewSelect().Model(&validFlags).Where("team = ? and service = ? and (now() - created_at) < interval '? milliseconds'", team[0], services[0], int64(conf.FlagExpireTime)/int64(time.Millisecond)).Scan(ctx)
+	}
+
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Errorf("Error fetching flag_ids: %v", err)
+		return
+	}
+
+	flagIDs := make(map[string]map[string][]interface{})
+	for _, flag := range validFlags {
+		if _, ok := flagIDs[flag.Service]; !ok {
+			flagIDs[flag.Service] = make(map[string][]interface{})
 		}
+		if _, ok := flagIDs[flag.Service][flag.Team]; !ok {
+			flagIDs[flag.Service][flag.Team] = make([]interface{}, 0)
+		}
+		if flag.ExternalFlagId == nil {
+			continue
+		}
+		flagIDs[flag.Service][flag.Team] = append(flagIDs[flag.Service][flag.Team], flag.ExternalFlagId)
+	}
+
+	if err := enc.Encode(flagIDs); err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Errorf("Error encoding flag_ids: %v", err)
+		return
 	}
 
 	log.Debugf("Received flag_ids request %v", query)

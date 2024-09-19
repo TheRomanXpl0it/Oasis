@@ -2,6 +2,10 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
+	"fmt"
+	"game/db"
 	"game/log"
 	"html/template"
 	"net"
@@ -13,10 +17,10 @@ type TemplService struct {
 	Name          string
 	StolenFlags   int
 	LostFlags     int
-	Score         int
+	Score         string
 	TicksUp       uint
 	TicksDown     uint
-	Sla           int
+	Sla           string
 	LastTickColor string
 	LastTick      bool
 }
@@ -24,28 +28,42 @@ type TemplService struct {
 type TemplTeam struct {
 	Team       string
 	Services   map[string]TemplService
-	TotalScore int
+	TotalScore string
+}
+
+// return error if the flag is already submitted
+func calcSLA(team string, service string) (totalSlas float64, totSla int, upSla int, err error) {
+	var ctx context.Context = context.Background()
+	totSla = 0
+	upSla = 0
+	totQuery := conn.NewSelect().Model((*db.SlaStatus)(nil)).ColumnExpr("count(id)").Where("team = ? and service = ? and flag_in_status != ? and flag_out_status != ? and check_status != ?", team, service, ERROR, ERROR, ERROR)
+	upQuery := conn.NewSelect().Model((*db.SlaStatus)(nil)).ColumnExpr("count(id)").Where("team = ? and service = ? and flag_in_status = ? and flag_out_status = ? and check_status = ?", team, service, OK, OK, OK)
+	if err := conn.NewSelect().ColumnExpr("(?)", totQuery).ColumnExpr("(?)", upQuery).Scan(ctx, &totSla, &upSla); err != nil {
+		log.Errorf("Error fetching sla status: %v", err)
+		return 0.0, 0, 0, err
+	}
+	if totSla == 0 {
+		return 1.0, 0, 0, nil
+	}
+	return float64(upSla) / float64(totSla), totSla, upSla, nil
 }
 
 func handleScoreboard(w http.ResponseWriter, r *http.Request) {
+	var ctx context.Context = context.Background()
 	tmpl := template.Must(template.ParseFiles("templates/index.html"))
 
-	stolenFlags.RLock()
-	lostFlags.RLock()
-	score.RLock()
-	ticksUp.RLock()
-	ticksDown.RLock()
-	sla.RLock()
-	totalScore.RLock()
-
 	realIPs := make([]net.IP, 0, len(conf.Teams))
+
 	for ip := range conf.Teams {
 		realIPs = append(realIPs, net.ParseIP(ip))
 	}
+
 	sort.Slice(realIPs, func(i, j int) bool {
 		return bytes.Compare(realIPs[i], realIPs[j]) < 0
 	})
+
 	sortedTeams := make([]string, len(realIPs))
+
 	for i, ip := range realIPs {
 		sortedTeams[i] = ip.String()
 	}
@@ -53,42 +71,70 @@ func handleScoreboard(w http.ResponseWriter, r *http.Request) {
 	teams := map[string][]TemplTeam{
 		"Teams": make([]TemplTeam, 0, len(conf.Teams)),
 	}
+
 	for _, team := range sortedTeams {
-		teamToken := conf.Teams[team]
 		t := TemplTeam{
 			Team:       team,
 			Services:   make(map[string]TemplService),
-			TotalScore: int(totalScore.score[teamToken]),
+			TotalScore: "0",
 		}
+		var totScore float64 = 0.0
 		for _, service := range conf.Services {
-			var color string
-			if ticksDown.last[teamToken][service] {
-				color = "green"
-			} else {
-				color = "red"
+			fetchedScore := new(db.ServiceScore)
+			if err := conn.NewSelect().Model(fetchedScore).Where("team = ? and service = ?", team, service).Scan(ctx); err != nil {
+				log.Panicf("Error fetching service score: %v", err)
 			}
+			sla, totSLA, upSLA, err := calcSLA(team, service)
+			if err != nil {
+				log.Panicf("Error calculating service SLA: %v", err)
+			}
+			stolenFlags := 0
+			lostFlags := 0
+			score := 0.0
+			err = conn.NewSelect().Model((*db.FlagSubmission)(nil)).ColumnExpr("count(*)").Join("JOIN flags flag ON flag.id = submit.flag_id").Where("submit.team = ? and flag.service = ?", team, service).Scan(ctx, &stolenFlags)
+			if err != nil {
+				if err != sql.ErrNoRows {
+					log.Panicf("Error fetching stolen flags: %v", err)
+				}
+			}
+
+			if err = conn.NewSelect().Model((*db.FlagSubmission)(nil)).ColumnExpr("count(*)").Join("JOIN flags flag ON flag.id = submit.flag_id").Where("flag.team = ? and flag.service = ?", team, service).Scan(ctx, &lostFlags); err != nil {
+				if err != sql.ErrNoRows {
+					log.Panicf("Error fetching lost flags: %v", err)
+				}
+			}
+
+			lastSLACheck := new(db.SlaStatus)
+			lastSLACheck.CheckStatus = ERROR
+
+			if err = conn.NewSelect().Model(lastSLACheck).Where("team = ? and service = ?", team, service).Order("flag_in_executed_at DESC").Limit(1).Scan(ctx); err != nil {
+				if err != sql.ErrNoRows {
+					log.Panicf("Error fetching last SLA check: %v", err)
+				}
+			}
+			lastTickColor := "red"
+			if lastSLACheck.CheckStatus == OK && lastSLACheck.FlagInStatus == OK && lastSLACheck.FlagOutStatus == OK {
+				lastTickColor = "green"
+			}
+
+			score = sla * float64(fetchedScore.Points)
 			t.Services[service] = TemplService{
 				Name:          service,
-				StolenFlags:   len(stolenFlags.flags[teamToken][service]),
-				LostFlags:     len(lostFlags.flags[teamToken][service]),
-				Score:         int(score.score[teamToken][service] * sla.score[teamToken][service]),
-				TicksUp:       ticksUp.ticks[teamToken][service],
-				TicksDown:     ticksDown.ticks[teamToken][service],
-				Sla:           int(sla.score[teamToken][service] * 100),
-				LastTickColor: color,
-				LastTick:      ticksDown.last[teamToken][service],
+				StolenFlags:   stolenFlags,
+				LostFlags:     lostFlags,
+				Score:         fmt.Sprintf("%.2f", score),
+				TicksUp:       uint(upSLA),
+				TicksDown:     uint(totSLA - upSLA),
+				Sla:           fmt.Sprintf("%.2f", sla*100),
+				LastTickColor: lastTickColor,
+				LastTick:      lastTickColor == "green",
 			}
+			totScore += score
 		}
+		t.TotalScore = fmt.Sprintf("%.2f", totScore)
 		teams["Teams"] = append(teams["Teams"], t)
-	}
 
-	stolenFlags.RUnlock()
-	lostFlags.RUnlock()
-	score.RUnlock()
-	ticksUp.RUnlock()
-	ticksDown.RUnlock()
-	sla.RUnlock()
-	totalScore.RUnlock()
+	}
 
 	tmpl.Execute(w, teams)
 }

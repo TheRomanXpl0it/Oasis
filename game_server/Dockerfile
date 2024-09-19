@@ -11,8 +11,12 @@ RUN pip install --break-system-packages -r /tmp/requirements.txt
 
 COPY ./entry.sh /tmp/
 RUN chmod +x /tmp/entry.sh
+WORKDIR /app/src/
+COPY ./src/go.mod ./src/go.sum /app/src/
+RUN go mod download
+WORKDIR /app/
 COPY . .
-WORKDIR /app/src
+WORKDIR /app/src/
 RUN go build .
 
 ENTRYPOINT [ "/tmp/entry.sh" ]

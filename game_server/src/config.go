@@ -1,6 +1,8 @@
 package main
 
 import (
+	"game/db"
+	"game/log"
 	"os"
 	"time"
 
@@ -8,15 +10,21 @@ import (
 )
 
 type Config struct {
-	RoundLen       time.Duration
-	LogLevel       string            `yaml:"log_level"`
-	Round          int64             `yaml:"round_len"`
-	Token          string            `yaml:"token"`
-	Nop            string            `yaml:"nop"`
-	Teams          map[string]string `yaml:"teams"`
-	Services       []string          `yaml:"services"`
-	CheckerDir     string            `yaml:"checker_dir"`
-	SubmitterLimit *int64            `yaml:"submitter_limit,omitempty"`
+	RoundLen             time.Duration
+	FlagExpireTime       time.Duration
+	SubmitterLimitTime   time.Duration
+	GameStartTime        time.Time
+	LogLevel             string            `yaml:"log_level"`
+	Round                int64             `yaml:"round_len"`
+	Token                string            `yaml:"token"`
+	Nop                  string            `yaml:"nop"`
+	Teams                map[string]string `yaml:"teams"`
+	Services             []string          `yaml:"services"`
+	CheckerDir           string            `yaml:"checker_dir"`
+	FlagExpireTicks      int64             `yaml:"flag_expire_ticks"`
+	InitialServicePoints float64           `yaml:"initial_service_points"`
+	SubmitterLimit       *int64            `yaml:"submitter_limit,omitempty"`
+	MaxFlagsPerRequest   int               `yaml:"max_flags_per_request"`
 }
 
 var conf *Config
@@ -40,6 +48,17 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	c.RoundLen = time.Duration(c.Round) * time.Millisecond
+	c.FlagExpireTime = time.Duration(c.FlagExpireTicks) * c.RoundLen
+	if c.SubmitterLimit != nil {
+		c.SubmitterLimitTime = time.Duration(*c.SubmitterLimit) * time.Millisecond
+	}
+	conf = c
+	log.SetLogLevel(conf.LogLevel)
+	initRand()
+	db.InitDB()
+	conn = db.ConnectDB()
+	initScoreboard()
+	conf.GameStartTime = db.GetStartTime()
 
 	return c, nil
 }

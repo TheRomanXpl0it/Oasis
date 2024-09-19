@@ -61,10 +61,6 @@ func init() {
 	logging.SetBackend(backends...)
 }
 
-func CloseLogFile() {
-	logFile.Close()
-}
-
 func SetLogLevel(newLevel string) {
 	var level logging.Level
 	lev := strings.ToLower(newLevel)
