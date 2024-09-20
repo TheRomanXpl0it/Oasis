@@ -27,7 +27,7 @@ func initScoreboard() {
 					_, err := conn.NewInsert().Model(&db.ServiceScore{
 						Team:    team,
 						Service: service,
-						Points:  conf.InitialServicePoints,
+						Score:   conf.InitialServiceScore,
 					}).Exec(ctx)
 					if err != nil {
 						log.Panicf("Error inserting service score %v", err)

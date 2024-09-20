@@ -8,6 +8,8 @@ import (
 	"game/log"
 	"net/http"
 	"time"
+
+	"github.com/gorilla/mux"
 )
 
 type FlagIDSub struct {
@@ -140,13 +142,19 @@ func retriveFlagIDs(w http.ResponseWriter, r *http.Request) {
 }
 
 func serveFlagIDs() {
-	mux := http.NewServeMux()
+	router := mux.NewRouter()
 
-	mux.HandleFunc("POST /postFlagId", submitFlagID)
-	mux.HandleFunc("GET /flagIds", retriveFlagIDs)
+	router.HandleFunc("/postFlagId", submitFlagID).Methods("POST")
+	router.HandleFunc("/flagIds", retriveFlagIDs).Methods("GET")
 
 	log.Noticef("Starting flag_ids server on :8081")
-	if err := http.ListenAndServe("0.0.0.0:8081", mux); err != nil {
-		log.Fatalf("Failed to start flag_ids server: %v", err)
+
+	srv := &http.Server{
+		Handler:      router,
+		Addr:         "0.0.0.0:8081",
+		WriteTimeout: 30 * time.Second,
+		ReadTimeout:  30 * time.Second,
 	}
+
+	log.Fatal(srv.ListenAndServe())
 }

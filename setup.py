@@ -67,11 +67,12 @@ def generate_teams_array(data):
             'name': f'Team {i}',
             'token': secrets.token_hex(32),
             'wireguard_port': data['wireguard_start_port']+i,
-            'nop': False
+            'nop': False,
+            'image': "null"
         }
         if i == 0 and data['enable_nop_team']:
             team['nop'] = True
-            team['name'] = 'NOP'
+            team['name'] = 'Nop Team'
         teams.append(team)
     return teams
 
@@ -103,7 +104,7 @@ else:
     data['max_vm_mem'] = args.max_vm_mem
     data['gameserver_log_level'] = args.gameserver_log_level
     data['flag_expire_ticks'] = args.flag_expire_ticks
-    data['initial_service_points'] = args.initial_service_points
+    data['initial_service_score'] = args.initial_service_score
     data['max_flags_per_request'] = args.max_flags_per_request
     data['enable_nop_team'] = input('Enable NOP team? (Y/n): ').lower() != 'n'
     data['server_addr'] = input('Server address: ')
@@ -351,11 +352,17 @@ gameserver_config = {
     "nop": f"10.60.{nop_team}.1" if not nop_team is None else "null",
     "submitter_limit": data['submission_timeout']*1000,
     "teams": {
-        f"10.60.{team['id']}.1": team['token'] for team in data['teams']
+        **{
+            f"10.60.{team['id']}.1": {
+                "token": team['token'],
+                "name": team['name'],
+                "image": team['image']
+            } for team in data['teams']
+        },
     },
     "services": [ele for ele in os.listdir('./game_server/checkers') if os.path.isdir(os.path.join('./game_server/checkers', ele))],
     "flag_expire_ticks": data['flag_expire_ticks'],
-    "initial_service_points": data['initial_service_points'],
+    "initial_service_score": data['initial_service_score'],
     "max_flags_per_request": data['max_flags_per_request'],
     "checker_dir": "../checkers/"
 }

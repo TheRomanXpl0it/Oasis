@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/uptrace/bun"
 )
 
@@ -27,23 +28,6 @@ var lockMappingMutex sync.Mutex
 var lastSubmissionTime map[string]time.Time = make(map[string]time.Time)
 var scoreMutex sync.Mutex
 
-func Values[M ~map[K]V, K comparable, V any](m M) []V {
-	r := make([]V, 0, len(m))
-	for _, v := range m {
-		r = append(r, v)
-	}
-	return r
-}
-
-func Contains[T comparable](s []T, e T) bool {
-	for _, v := range s {
-		if v == e {
-			return true
-		}
-	}
-	return false
-}
-
 var scale float64 = 15 * math.Sqrt(5.0)
 var norm float64 = math.Log(math.Log(5.0)) / 12.0
 
@@ -56,7 +40,7 @@ func elaborateFlag(team string, flag string, resp *SubResp) {
 		log.Debugf("Flag %s from %s: invalid", flag, team)
 		return
 	}
-	if info.Team == conf.Teams[conf.Nop] {
+	if info.Team == conf.Nop {
 		resp.Msg += "Denied: flag from nop team"
 		log.Debugf("Flag %s from %s: from nop team", flag, team)
 		return
@@ -95,8 +79,8 @@ func elaborateFlag(team string, flag string, resp *SubResp) {
 		if err := conn.NewSelect().Model(victimScore).Where("team = ? and service = ?", info.Team, info.Service).Scan(ctx); err != nil {
 			return err
 		}
-		offensePoints = scale / (1 + math.Exp((math.Sqrt(attackerScore.Points)-math.Sqrt(victimScore.Points))*norm))
-		defensePoints := min(victimScore.Points, offensePoints)
+		offensePoints = scale / (1 + math.Exp((math.Sqrt(attackerScore.Score)-math.Sqrt(victimScore.Score))*norm))
+		defensePoints := min(victimScore.Score, offensePoints)
 
 		_, err = conn.NewInsert().Model(&db.FlagSubmission{
 			FlagID:          info.ID,
@@ -107,10 +91,10 @@ func elaborateFlag(team string, flag string, resp *SubResp) {
 		if err != nil {
 			return err
 		}
-		if _, err := conn.NewUpdate().Model(attackerScore).WherePK().Set("points = points + ?", offensePoints).Exec(ctx); err != nil {
+		if _, err := conn.NewUpdate().Model(attackerScore).WherePK().Set("score = score + ?", offensePoints).Exec(ctx); err != nil {
 			return err
 		}
-		if _, err := conn.NewUpdate().Model(victimScore).WherePK().Set("points = points - ?", defensePoints).Exec(ctx); err != nil {
+		if _, err := conn.NewUpdate().Model(victimScore).WherePK().Set("score = score - ?", defensePoints).Exec(ctx); err != nil {
 			return err
 		}
 
@@ -146,20 +130,17 @@ func elaborateFlags(team string, submittedFlags []string) []SubResp {
 func submitFlags(w http.ResponseWriter, r *http.Request) {
 	teamToken := r.Header.Get("X-Team-Token")
 
-	if teamToken == "" || !Contains(Values(conf.Teams), teamToken) || teamToken == conf.Teams[conf.Nop] {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
 	team := ""
 	for ip, t := range conf.Teams {
-		if t == teamToken {
+		if t.Token == teamToken {
 			team = ip
 			break
 		}
 	}
-	if team == "" {
-		panic("Team not found on submitter (unexpected)")
+
+	if team == "" || team == conf.Nop {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
 	}
 
 	// Checking if team lock exists, if not create it
@@ -203,11 +184,16 @@ func submitFlags(w http.ResponseWriter, r *http.Request) {
 }
 
 func serveSubmission() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("PUT /flags", submitFlags)
+	router := mux.NewRouter()
+	router.HandleFunc("/flags", submitFlags).Methods("PUT")
 
 	log.Noticef("Starting flag_submission on :8080")
-	if err := http.ListenAndServe("0.0.0.0:8080", mux); err != nil {
-		log.Fatalf("Error serving flag_submission: %v", err)
+	srv := &http.Server{
+		Handler:      router,
+		Addr:         "0.0.0.0:8080",
+		WriteTimeout: 30 * time.Second,
+		ReadTimeout:  30 * time.Second,
 	}
+
+	log.Fatal(srv.ListenAndServe())
 }

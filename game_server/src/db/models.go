@@ -35,26 +35,26 @@ type FlagSubmission struct {
 }
 
 type StatusHistory struct {
-	bun.BaseModel        `bun:"table:sla_statues"`
-	ID                   int64  `bun:",pk,autoincrement"`
-	Team                 string `bun:",notnull,unique:sla-check"`
-	Service              string `bun:",notnull,unique:sla-check"`
-	Round                uint   `bun:",notnull,unique:sla-check"`
-	FlagInStatus         int    `bun:",notnull"`
-	FlagInStatusMessage  string
-	FlagInExecutedAt     time.Time `bun:",notnull"`
-	FlagOutStatus        int       `bun:",notnull"`
-	FlagOutStatusMessage string
-	FlagOutExecutedAt    time.Time `bun:",notnull"`
-	CheckStatus          int       `bun:",notnull"`
-	CheckStatusMessage   string
-	CheckExecutedAt      time.Time `bun:",notnull"`
-	ActualSla            float64   `bun:""`
-	ActualScore          float64   `bun:""`
-	LostFlags            uint      `bun:""`
-	StolenFlags          uint      `bun:""`
-	SlaUpTimes           uint      `bun:""`
-	SlaTotTimes          uint      `bun:""`
+	bun.BaseModel   `bun:"table:sla_statues"`
+	ID              int64  `bun:",pk,autoincrement"`
+	Team            string `bun:",notnull,unique:sla-check"`
+	Service         string `bun:",notnull,unique:sla-check"`
+	Round           uint   `bun:",notnull,unique:sla-check"`
+	PutFlagStatus   int    `bun:",notnull"`
+	PutFlagMessage  string
+	PutFlagAt       time.Time `bun:",notnull"`
+	GetFlagStatus   int       `bun:",notnull"`
+	GetFlagMessage  string
+	GetFlagAt       time.Time `bun:",notnull"`
+	CheckStatus     int       `bun:",notnull"`
+	CheckMessage    string
+	CheckExecutedAt time.Time `bun:",notnull"`
+	Sla             float64   `bun:""`
+	Score           float64   `bun:""`
+	LostFlags       uint      `bun:""`
+	StolenFlags     uint      `bun:""`
+	SlaUpTimes      uint      `bun:""`
+	SlaTotTimes     uint      `bun:""`
 }
 
 type ServiceScore struct {
@@ -62,7 +62,7 @@ type ServiceScore struct {
 	ID            int64   `bun:",pk,autoincrement"`
 	Team          string  `bun:",notnull"`
 	Service       string  `bun:",notnull"`
-	Points        float64 `bun:",notnull"`
+	Score         float64 `bun:",notnull"`
 }
 
 type Environment struct {
