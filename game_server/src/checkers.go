@@ -138,6 +138,10 @@ func calcRoundStartTime(round uint) time.Time {
 	return conf.GameStartTime.Add(time.Duration(int64(conf.RoundLen) * int64(round)))
 }
 
+func remainingTimeFromRound(round uint) time.Duration {
+	return time.Until(calcRoundStartTime(round))
+}
+
 func waitForRound(round uint) {
 	timeToWait := time.Until(calcRoundStartTime(round))
 	if timeToWait > 0 {
@@ -191,16 +195,18 @@ func checkerRoutine() {
 	waitForRound(currentRound) // Wait for the first/next round
 
 	for {
-		ctx, cancel := context.WithTimeout(context.Background(), conf.RoundLen)
+		timeForNextRound := int64(remainingTimeFromRound(currentRound+1)) / int64(time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeForNextRound)*time.Millisecond)
 		waitGroup.Add(len(teams) * len(conf.Services))
 		for i, team := range teams {
 			for _, service := range conf.Services {
 
-				go func(i int, team string, service string, waitGroup *sync.WaitGroup) {
+				go func(i int, team string, service string, waitGroup *sync.WaitGroup, maxTimeout int64) {
 					defer waitGroup.Done()
-					timeout1 := time.Duration(rand.Intn(int(conf.Round)/4)) * time.Millisecond
-					timeout2 := time.Duration(rand.Intn(int(conf.Round)/4)) * time.Millisecond
-					timeout3 := time.Duration(rand.Intn(int(conf.Round)/4)) * time.Millisecond
+
+					timeout1 := time.Duration(rand.Intn(int(maxTimeout)/4)) * time.Millisecond
+					timeout2 := time.Duration(rand.Intn(int(maxTimeout)/4)) * time.Millisecond
+					timeout3 := time.Duration(rand.Intn(int(maxTimeout)/4)) * time.Millisecond
 
 					time.Sleep(timeout1)
 					params := &CheckerParams{}
@@ -278,7 +284,7 @@ func checkerRoutine() {
 						log.Criticalf("Error inserting status %v:%v on %v: %v", team, i, service, err)
 					}
 
-				}(i, team, service, &waitGroup)
+				}(i, team, service, &waitGroup, timeForNextRound)
 			}
 		}
 
