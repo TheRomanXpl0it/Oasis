@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -47,7 +48,47 @@ func GetStartTime() time.Time {
 		log.Panicf("Error parsing start time: %v", err)
 	}
 	return startTime
+}
 
+func GetExposedRound() int {
+	db := ConnectDB()
+	ctx := context.Background()
+	defer db.Close()
+
+	envVar := new(Environment)
+
+	if err := db.NewSelect().Model(envVar).Where("key = ?", "ACTUAL_ROUND_EXPOSED").Scan(ctx); err != nil {
+		if err == sql.ErrNoRows {
+			_, err := db.NewInsert().Model(&Environment{
+				Key:   "ACTUAL_ROUND_EXPOSED",
+				Value: "-1",
+			}).Exec(context.Background())
+			if err != nil {
+				log.Panicf("Error inserting exposed round: %v", err)
+			}
+			return -1
+		} else {
+			log.Panicf("Error fetching exposed round: %v", err)
+		}
+	}
+	exposedRound, err := strconv.Atoi(envVar.Value)
+	if err != nil {
+		log.Panicf("Error parsing exposed round time: %v", err)
+	}
+	return exposedRound
+}
+
+func SetExposedRound(round int64) {
+	db := ConnectDB()
+	ctx := context.Background()
+	defer db.Close()
+
+	envVar := new(Environment)
+
+	_, err := db.NewUpdate().Model(envVar).Set("value = ?", round).Where("key = ?", "ACTUAL_ROUND_EXPOSED").Exec(ctx)
+	if err != nil {
+		log.Panicf("Error updating exposed round: %v", err)
+	}
 }
 
 func InitDB() {
@@ -59,7 +100,7 @@ func InitDB() {
 	models := []interface{}{
 		(*Flag)(nil),
 		(*FlagSubmission)(nil),
-		(*SlaStatus)(nil),
+		(*StatusHistory)(nil),
 		(*Environment)(nil),
 		(*ServiceScore)(nil),
 	}
@@ -70,6 +111,8 @@ func InitDB() {
 			log.Fatalf("Error creating table model: %v", err)
 		}
 	}
+
+	GetExposedRound() // Ensure the exposed round is set
 
 	_, err := db.ExecContext(ctx, `
 		CREATE INDEX IF NOT EXISTS idx_flags_team ON flags(team);

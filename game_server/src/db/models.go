@@ -17,7 +17,7 @@ type Flag struct {
 	bun.BaseModel  `bun:"table:flags,alias:flag"`
 	ID             string      `bun:",pk"`
 	Team           string      `bun:",notnull"`
-	Round          int         `bun:",notnull"`
+	Round          uint        `bun:",notnull"`
 	Service        string      `bun:",notnull"`
 	CreatedAt      time.Time   `bun:",notnull,default:current_timestamp"`
 	ExternalFlagId interface{} `bun:"type:jsonb"`
@@ -34,12 +34,12 @@ type FlagSubmission struct {
 	Flag            *Flag     `bun:"rel:belongs-to,join:flag_id=id"`
 }
 
-type SlaStatus struct {
+type StatusHistory struct {
 	bun.BaseModel        `bun:"table:sla_statues"`
 	ID                   int64  `bun:",pk,autoincrement"`
 	Team                 string `bun:",notnull,unique:sla-check"`
 	Service              string `bun:",notnull,unique:sla-check"`
-	Round                int    `bun:",notnull,unique:sla-check"`
+	Round                uint   `bun:",notnull,unique:sla-check"`
 	FlagInStatus         int    `bun:",notnull"`
 	FlagInStatusMessage  string
 	FlagInExecutedAt     time.Time `bun:",notnull"`
@@ -51,6 +51,10 @@ type SlaStatus struct {
 	CheckExecutedAt      time.Time `bun:",notnull"`
 	ActualSla            float64   `bun:""`
 	ActualScore          float64   `bun:""`
+	LostFlags            uint      `bun:""`
+	StolenFlags          uint      `bun:""`
+	SlaUpTimes           uint      `bun:""`
+	SlaTotTimes          uint      `bun:""`
 }
 
 type ServiceScore struct {
@@ -72,6 +76,7 @@ type Environment struct {
 DB ENVIRONMENT VARIABLES
 
 START_TIME - The time the game started
+ACTUAL_ROUND_EXPOSED - The current round exposed in the APIs
 
 
 */
