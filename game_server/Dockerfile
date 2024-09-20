@@ -1,3 +1,11 @@
+FROM --platform=$BUILDPLATFORM oven/bun as frontend 
+WORKDIR /app
+ADD ./frontend/package.json .
+ADD ./frontend/bun.lockb .
+RUN bun install
+COPY ./frontend/ .
+RUN bun run build
+
 FROM golang:1.22
 
 WORKDIR /app/
@@ -14,8 +22,12 @@ RUN chmod +x /tmp/entry.sh
 WORKDIR /app/src/
 COPY ./src/go.mod ./src/go.sum /app/src/
 RUN go mod download
-WORKDIR /app/
-COPY . .
+WORKDIR /app/src/
+COPY ./src/ .
+WORKDIR /app/checkers/
+COPY ./checkers/ .
+WORKDIR /app/src/frontend
+COPY --from=frontend /app/dist .
 WORKDIR /app/src/
 RUN go build .
 
