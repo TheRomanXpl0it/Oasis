@@ -24,8 +24,6 @@ COPY ./src/go.mod ./src/go.sum /app/src/
 RUN go mod download
 WORKDIR /app/src/
 COPY ./src/ .
-WORKDIR /app/checkers/
-COPY ./checkers/ .
 WORKDIR /app/src/frontend
 COPY --from=frontend /app/dist .
 WORKDIR /app/src/

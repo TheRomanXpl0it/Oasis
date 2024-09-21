@@ -206,7 +206,10 @@ config = {
                     "priority": 10,
                     "ipv4_address": "10.10.0.1"
                 }
-            }
+            },
+            "volumes": [
+                "./game_server/checkers/:/app/checkers/"
+            ]
         },
         **{
             f"team{team['id']}": {

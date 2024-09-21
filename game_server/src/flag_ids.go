@@ -20,6 +20,8 @@ type FlagIDSub struct {
 	FlagID    interface{} `json:"flagId"`
 }
 
+//Needed to save on postgres also string, numbers ecc... that are not directly supported by jsonb type
+
 func submitFlagID(w http.ResponseWriter, r *http.Request) {
 	var ctx context.Context = context.Background()
 	jsonDecoder := json.NewDecoder(r.Body)
@@ -51,7 +53,7 @@ func submitFlagID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := conn.NewUpdate().Model(associatedFlag).Set("external_flag_id = ?", sub.FlagID).WherePK().Exec(ctx); err != nil {
+	if _, err := conn.NewUpdate().Model(associatedFlag).Set("external_flag_id = ?", db.FlagIdWrapper{K: sub.FlagID}).WherePK().Exec(ctx); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		log.Criticalf("Error updating flag_id: %v", err)
 		return
@@ -63,6 +65,7 @@ func submitFlagID(w http.ResponseWriter, r *http.Request) {
 
 func retriveFlagIDs(w http.ResponseWriter, r *http.Request) {
 	var ctx context.Context = context.Background()
+	currentRound := db.GetExposedRound()
 	query := r.URL.Query()
 
 	enc := json.NewEncoder(w)
@@ -103,13 +106,13 @@ func retriveFlagIDs(w http.ResponseWriter, r *http.Request) {
 	validFlags := make([]db.Flag, 0)
 	var err error = nil
 	if !ok_service && !ok_team {
-		err = conn.NewSelect().Model(&validFlags).Where("now() - created_at < interval '? milliseconds'", int64(conf.FlagExpireTime)/int64(time.Millisecond)).Scan(ctx)
+		err = conn.NewSelect().Model(&validFlags).Where("? - round < ? and round <= ?", currentRound, conf.FlagExpireTicks, currentRound).Scan(ctx)
 	} else if !ok_service {
-		err = conn.NewSelect().Model(&validFlags).Where("team = ? and (now() - created_at < interval '? milliseconds')", team[0], int64(conf.FlagExpireTime)/int64(time.Millisecond)).Scan(ctx)
+		err = conn.NewSelect().Model(&validFlags).Where("team = ? and ? - round < ? and round <= ?", team[0], currentRound, conf.FlagExpireTicks, currentRound).Scan(ctx)
 	} else if !ok_team {
-		err = conn.NewSelect().Model(&validFlags).Where("service = ? and (now() - created_at) < interval '? milliseconds'", services[0], int64(conf.FlagExpireTime)/int64(time.Millisecond)).Scan(ctx)
+		err = conn.NewSelect().Model(&validFlags).Where("service = ? and ? - round < ? and round <= ?", services[0], currentRound, conf.FlagExpireTicks, currentRound).Scan(ctx)
 	} else {
-		err = conn.NewSelect().Model(&validFlags).Where("team = ? and service = ? and (now() - created_at) < interval '? milliseconds'", team[0], services[0], int64(conf.FlagExpireTime)/int64(time.Millisecond)).Scan(ctx)
+		err = conn.NewSelect().Model(&validFlags).Where("team = ? and service = ? and ? - round < ? and round <= ?", team[0], services[0], currentRound, conf.FlagExpireTicks, currentRound).Scan(ctx)
 	}
 
 	if err != nil {
@@ -126,10 +129,10 @@ func retriveFlagIDs(w http.ResponseWriter, r *http.Request) {
 		if _, ok := flagIDs[flag.Service][flag.Team]; !ok {
 			flagIDs[flag.Service][flag.Team] = make([]interface{}, 0)
 		}
-		if flag.ExternalFlagId == nil {
+		if flag.ExternalFlagId.K == nil {
 			continue
 		}
-		flagIDs[flag.Service][flag.Team] = append(flagIDs[flag.Service][flag.Team], flag.ExternalFlagId)
+		flagIDs[flag.Service][flag.Team] = append(flagIDs[flag.Service][flag.Team], flag.ExternalFlagId.K)
 	}
 
 	if err := enc.Encode(flagIDs); err != nil {

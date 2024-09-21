@@ -31,7 +31,7 @@ var scoreMutex sync.Mutex
 var scale float64 = 15 * math.Sqrt(5.0)
 var norm float64 = math.Log(math.Log(5.0)) / 12.0
 
-func elaborateFlag(team string, flag string, resp *SubResp) {
+func elaborateFlag(team string, flag string, resp *SubResp, round uint) {
 	var ctx context.Context = context.Background()
 	info := new(db.Flag)
 	err := conn.NewSelect().Model(info).Where("id = ?", flag).Scan(ctx)
@@ -50,7 +50,7 @@ func elaborateFlag(team string, flag string, resp *SubResp) {
 		log.Debugf("Flag %s from %s: is your own", flag, team)
 		return
 	}
-	if time.Since(info.CreatedAt) > conf.FlagExpireTime {
+	if round-info.Round >= uint(conf.FlagExpireTicks) {
 		resp.Msg += "Denied: flag too old"
 		log.Debugf("Flag %s from %s: too old", flag, team)
 		return
@@ -113,7 +113,7 @@ func elaborateFlag(team string, flag string, resp *SubResp) {
 	log.Debugf("Flag %s from %s: %.02f flag points", flag, team, offensePoints)
 }
 
-func elaborateFlags(team string, submittedFlags []string) []SubResp {
+func elaborateFlags(team string, submittedFlags []string, round uint) []SubResp {
 	responses := make([]SubResp, 0, len(submittedFlags))
 	for _, flag := range submittedFlags {
 		resp := SubResp{
@@ -121,7 +121,7 @@ func elaborateFlags(team string, submittedFlags []string) []SubResp {
 			Status: false,
 			Msg:    fmt.Sprintf("[%s] ", flag),
 		}
-		elaborateFlag(team, flag, &resp)
+		elaborateFlag(team, flag, &resp, round)
 		responses = append(responses, resp)
 	}
 	return responses
@@ -129,6 +129,12 @@ func elaborateFlags(team string, submittedFlags []string) []SubResp {
 
 func submitFlags(w http.ResponseWriter, r *http.Request) {
 	teamToken := r.Header.Get("X-Team-Token")
+	currentTick := db.GetExposedRound()
+
+	if currentTick < 0 {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
 
 	team := ""
 	for ip, t := range conf.Teams {
@@ -175,7 +181,7 @@ func submitFlags(w http.ResponseWriter, r *http.Request) {
 	}
 
 	submittedFlags = submittedFlags[:min(len(submittedFlags), conf.MaxFlagsPerRequest)]
-	responses := elaborateFlags(team, submittedFlags)
+	responses := elaborateFlags(team, submittedFlags, uint(currentTick))
 
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(responses); err != nil {

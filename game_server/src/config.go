@@ -17,7 +17,6 @@ type TeamInfo struct {
 
 type Config struct {
 	RoundLen            time.Duration
-	FlagExpireTime      time.Duration
 	SubmitterLimitTime  time.Duration
 	GameStartTime       time.Time
 	LogLevel            string              `yaml:"log_level"`
@@ -55,7 +54,6 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	c.RoundLen = time.Duration(c.Round) * time.Millisecond
-	c.FlagExpireTime = time.Duration(c.FlagExpireTicks) * c.RoundLen
 	if c.SubmitterLimit != nil {
 		c.SubmitterLimitTime = time.Duration(*c.SubmitterLimit) * time.Millisecond
 	}

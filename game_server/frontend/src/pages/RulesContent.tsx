@@ -122,6 +122,31 @@ print(requests.put('http://10.10.0.1:8080/flags', headers={
         <Title order={2} mt="lg">Flag IDs</Title>
         <Text mt="lg">Some services have "Flag ID"s, additional information that you might need for an exploit. Usually this is the username of the Game System's account that stores the flag. The flag ids are only given for flags that are still valid.</Text>
         <Text mt="md">FlagIds can be retrieved by performing an HTTP GET request to the Game System at <Link to="http://10.10.0.1:8081/flagIds">http://10.10.0.1:8081/flagIds?team=10.60.0.1&service=ServiceName</Link>. The request query parameters are optional and can be used to filter the results.</Text>
+        <Text mt="md">The request will return a json array, you will receive a json format like this:</Text>
+        <Code block mt="md">
+{`{
+    "service1": {
+        "10.60.0.1":[
+            "flagid1",
+            "flagid2",
+            ...
+        ],
+        ...
+    },
+    "service2": {
+        "10.60.0.1":[
+            {
+                "content_id": 2,
+                "username": "username1"
+            },
+            ...
+        ],
+        ...
+    },
+    ...
+}`}
+        </Code>
+        <Text mt="md">The flag id format depends on the service, anche could be also not exist for a particular service</Text>
         <Title order={2} mt="lg">Technical and Human Behaviour</Title>
 
         <Text mt="lg">We'd like everyone to enjoy a fair game. For this reason we ask you to follow these simple rules:</Text>

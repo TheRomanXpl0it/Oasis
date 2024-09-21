@@ -13,14 +13,18 @@ import (
 	- Services also are not in the database, they are hardcoded in the configuration file.
 */
 
+type FlagIdWrapper struct {
+	K interface{} `json:"k"`
+}
+
 type Flag struct {
 	bun.BaseModel  `bun:"table:flags,alias:flag"`
-	ID             string      `bun:",pk"`
-	Team           string      `bun:",notnull"`
-	Round          uint        `bun:",notnull"`
-	Service        string      `bun:",notnull"`
-	CreatedAt      time.Time   `bun:",notnull,default:current_timestamp"`
-	ExternalFlagId interface{} `bun:"type:jsonb"`
+	ID             string        `bun:",pk"`
+	Team           string        `bun:",notnull"`
+	Round          uint          `bun:",notnull"`
+	Service        string        `bun:",notnull"`
+	CreatedAt      time.Time     `bun:",notnull,default:current_timestamp"`
+	ExternalFlagId FlagIdWrapper `bun:"type:jsonb"`
 }
 
 type FlagSubmission struct {
@@ -35,26 +39,26 @@ type FlagSubmission struct {
 }
 
 type StatusHistory struct {
-	bun.BaseModel   `bun:"table:sla_statues"`
-	ID              int64  `bun:",pk,autoincrement"`
-	Team            string `bun:",notnull,unique:sla-check"`
-	Service         string `bun:",notnull,unique:sla-check"`
-	Round           uint   `bun:",notnull,unique:sla-check"`
-	PutFlagStatus   int    `bun:",notnull"`
-	PutFlagMessage  string
-	PutFlagAt       time.Time `bun:",notnull"`
-	GetFlagStatus   int       `bun:",notnull"`
-	GetFlagMessage  string
-	GetFlagAt       time.Time `bun:",notnull"`
-	CheckStatus     int       `bun:",notnull"`
-	CheckMessage    string
-	CheckExecutedAt time.Time `bun:",notnull"`
-	Sla             float64   `bun:""`
-	Score           float64   `bun:""`
-	LostFlags       uint      `bun:""`
-	StolenFlags     uint      `bun:""`
-	SlaUpTimes      uint      `bun:""`
-	SlaTotTimes     uint      `bun:""`
+	bun.BaseModel  `bun:"table:sla_statues"`
+	ID             int64  `bun:",pk,autoincrement"`
+	Team           string `bun:",notnull,unique:sla-check"`
+	Service        string `bun:",notnull,unique:sla-check"`
+	Round          uint   `bun:",notnull,unique:sla-check"`
+	PutFlagStatus  int    `bun:",notnull"`
+	PutFlagMessage string
+	PutFlagAt      time.Time `bun:",notnull"`
+	GetFlagStatus  int       `bun:",notnull"`
+	GetFlagMessage string
+	GetFlagAt      time.Time `bun:",notnull"`
+	CheckStatus    int       `bun:",notnull"`
+	CheckMessage   string
+	CheckdAt       time.Time `bun:",notnull"`
+	Sla            float64   `bun:""`
+	Score          float64   `bun:""`
+	LostFlags      uint      `bun:""`
+	StolenFlags    uint      `bun:""`
+	SlaUpTimes     uint      `bun:""`
+	SlaTotTimes    uint      `bun:""`
 }
 
 type ServiceScore struct {
