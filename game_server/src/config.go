@@ -31,6 +31,7 @@ type Config struct {
 	InitialServiceScore float64             `yaml:"initial_service_score"`
 	SubmitterLimit      *int64              `yaml:"submitter_limit,omitempty"`
 	MaxFlagsPerRequest  int                 `yaml:"max_flags_per_request"`
+	Debug               bool                `yaml:"debug"`
 }
 
 var conf *Config

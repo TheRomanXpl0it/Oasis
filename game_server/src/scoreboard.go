@@ -8,9 +8,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/cors"
 )
 
 type ServiceRoundStatus struct {
@@ -48,6 +51,7 @@ func handleChart(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
+		return
 	}
 	response := make([]ChartAPIResponse, round+1)
 	dbScores := new([]db.StatusHistory)
@@ -92,7 +96,6 @@ func handleChart(w http.ResponseWriter, r *http.Request) {
 
 type TeamRoundStatus struct {
 	Team     string               `json:"team"`
-	Image    string               `json:"image"`
 	Score    float64              `json:"score"`
 	Services []ServiceRoundStatus `json:"services"`
 }
@@ -115,6 +118,7 @@ func handleScoreboard(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
+		return
 	}
 
 	response := ScoreboardAPIResponse{
@@ -153,7 +157,6 @@ func handleScoreboard(w http.ResponseWriter, r *http.Request) {
 		}
 		response.Scores = append(response.Scores, TeamRoundStatus{
 			Team:     team,
-			Image:    "",
 			Score:    totScore,
 			Services: services,
 		})
@@ -222,7 +225,6 @@ func handleTeam(w http.ResponseWriter, r *http.Request) {
 			Round: uint(i),
 			Score: TeamRoundStatus{
 				Team:     team,
-				Image:    "",
 				Score:    totalScore,
 				Services: services,
 			},
@@ -239,6 +241,7 @@ func handleTeam(w http.ResponseWriter, r *http.Request) {
 }
 
 type TeamConfig struct {
+	Id    uint   `json:"id"`
 	Name  string `json:"name"`
 	Host  string `json:"host"`
 	Image string `json:"image"`
@@ -253,18 +256,30 @@ type ConfigAPIResponse struct {
 	FlagExpireTicks     uint         `json:"flag_expire_ticks"`
 	SubmitterFlagsLimit uint         `json:"submitter_flags_limit"`
 	SubmitterRateLimit  uint         `json:"submitter_rate_limit"`
+	CurrentRound        int          `json:"current_round"`
+}
+
+func extractTeamID(ip string) uint {
+	teamID := 0
+	splitted := strings.Split(ip, ".")
+	if len(splitted) == 4 {
+		teamID, _ = strconv.Atoi(splitted[2])
+	}
+	return uint(teamID)
 }
 
 func handleConfig(w http.ResponseWriter, r *http.Request) {
 	teams := make([]TeamConfig, 0, len(conf.Teams))
 	for ip, team := range conf.Teams {
 		teams = append(teams, TeamConfig{
-			Name:  "team-" + ip,
+			Id:    extractTeamID(ip),
+			Name:  conf.Teams[ip].Name,
 			Host:  ip,
-			Image: "",
+			Image: conf.Teams[ip].Image,
 			Nop:   team == conf.Teams[conf.Nop],
 		})
 	}
+
 	if err := json.NewEncoder(w).Encode(ConfigAPIResponse{
 		Teams:               teams,
 		Services:            conf.Services,
@@ -273,6 +288,7 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 		FlagExpireTicks:     uint(conf.FlagExpireTicks),
 		SubmitterFlagsLimit: uint(conf.MaxFlagsPerRequest),
 		SubmitterRateLimit:  uint(*conf.SubmitterLimit),
+		CurrentRound:        db.GetExposedRound(),
 	}); err != nil {
 		log.Errorf("Error encoding response: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -320,8 +336,18 @@ func serveScoreboard() {
 	spa := spaHandler{staticPath: "frontend", indexPath: "index.html"}
 	router.PathPrefix("/").Handler(spa)
 
+	var finalHandler http.Handler = router
+
+	if conf.Debug {
+		corsPolicy := cors.New(cors.Options{
+			AllowedOrigins:   []string{"*"},
+			AllowCredentials: true,
+		})
+		finalHandler = corsPolicy.Handler(router)
+	}
+
 	srv := &http.Server{
-		Handler:      router,
+		Handler:      finalHandler,
 		Addr:         "0.0.0.0:80",
 		WriteTimeout: 30 * time.Second,
 		ReadTimeout:  30 * time.Second,

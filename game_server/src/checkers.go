@@ -235,6 +235,7 @@ func checkerRoutine() {
 					statusData.PutFlagAt = time.Now()
 					time.Sleep(timeout3)
 
+					// TODO: get_flag has to be performed for all the old flags still considered valid, this implementation is wrong
 					params.Action = GET_FLAG
 					status, msg = runChecker(team, service, params, ctx)
 					statusData.GetFlagStatus = status

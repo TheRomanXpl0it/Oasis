@@ -364,7 +364,8 @@ gameserver_config = {
     "flag_expire_ticks": data['flag_expire_ticks'],
     "initial_service_score": data['initial_service_score'],
     "max_flags_per_request": data['max_flags_per_request'],
-    "checker_dir": "../checkers/"
+    "checker_dir": "../checkers/",
+    "debug": "true" if args.debug else "false",
 }
 
 with open('game_server/src/config.yml', 'w') as f:
