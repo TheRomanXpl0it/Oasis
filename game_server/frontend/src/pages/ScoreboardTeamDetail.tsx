@@ -19,6 +19,7 @@ export const ScoreboardTeamDetail = () => {
     const teamData = useTeamQuery(teamId??"")
     const configData = useConfigQuery()
     const teamSolver = useTeamSolver()
+    const services = configData.data?.services.sort()??[]
 
     const currentTeam = teamSolver(`10.60.${teamId}.1`)
 
@@ -42,7 +43,7 @@ export const ScoreboardTeamDetail = () => {
                 <Pill style={{ backgroundColor: "var(--mantine-color-cyan-filled)", color: "white", fontWeight: "bold" }}>{teamData.score.team}</Pill>
             </Box></Table.Td>
             <Table.Td><Box className="center-flex" style={{ fontWeight: "bolder" }}>{teamData.score.score.toFixed(2)}</Box></Table.Td>
-            {teamData.score.services.map((service, i) => <Table.Td key={i}><ServiceScoreData score={service} /></Table.Td>)}
+            {services.map((service, i) => <Table.Td key={i}><ServiceScoreData score={teamData.score.services.find(ele => ele.service == service)} /></Table.Td>)}
         </Table.Tr>
     });
     
@@ -88,7 +89,7 @@ export const ScoreboardTeamDetail = () => {
                                 <ImTarget size={20} /><Space w="xs" />Score
                             </Box>
                         </Table.Th>
-                        {configData.data.services.map(service => <Table.Th key={service}>
+                        {services.map(service => <Table.Th key={service}>
                             <Box className="center-flex" style={{width: "100%"}}>
                                 <FaServer size={20} /><Space w="xs" />{service}
                             </Box>

@@ -7,7 +7,9 @@ import { IoSpeedometer } from "react-icons/io5";
 import { modals } from "@mantine/modals";
 
 
-export const ServiceScoreData = ({ score }: { score: TeamServiceScore }) => {
+export const ServiceScoreData = ({ score }: { score?: TeamServiceScore }) => {
+
+    if (!score) return <></>
 
     const slaOk = score.sla_check == 101 && score.get_flag == 101 && score.put_flag == 101 ? true : false
 

@@ -38,6 +38,8 @@ export const ScoreboardPage = () => {
     const teamSolver = useTeamSolver()
     const navigate = useNavigate()
 
+    const services = configData.data?.services.sort()??[]
+
     const series = configData.data?.teams.sort((a,b) => a.host.localeCompare(b.host)).map(team => ({  label: team.name, color: team.nop?"grey":hashedColor(team.name+team.host), name: btoa(team.host) }))??[]
     const dataLoaded = chartData.isSuccess && scoreboardData.isSuccess && configData.isSuccess
     const rows = scoreboardData.data?.scores.sort((a,b)=>{
@@ -62,7 +64,7 @@ export const ScoreboardPage = () => {
                 <Pill style={{ backgroundColor: "var(--mantine-color-cyan-filled)", color: "white", fontWeight: "bold" }}>{teamData.team}</Pill>
             </Box></Table.Td>
             <Table.Td><Box className="center-flex" style={{ fontWeight: "bolder" }}>{teamData.score.toFixed(2)}</Box></Table.Td>
-            {teamData.services.map((service, i) => <Table.Td key={i}><ServiceScoreData score={service} /></Table.Td>)}
+            {services.map((service, i) => <Table.Td key={i}><ServiceScoreData score={teamData.services.find(ele => ele.service == service)} /></Table.Td>)}
         </Table.Tr>
     });
     
@@ -112,7 +114,7 @@ export const ScoreboardPage = () => {
                                 <ImTarget size={20} /><Space w="xs" />Score
                             </Box>
                         </Table.Th>
-                        {configData.data.services.map(service => <Table.Th key={service}>
+                        {services.map(service => <Table.Th key={service}>
                             <Box className="center-flex" style={{width: "100%"}}>
                                 <FaServer size={20} /><Space w="xs" />{service}
                             </Box>
