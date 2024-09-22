@@ -1,45 +1,11 @@
 package main
 
 import (
-	"context"
-	"database/sql"
-	"game/db"
 	"game/log"
 	"os"
 	"os/signal"
 	"syscall"
-
-	"github.com/uptrace/bun"
 )
-
-var conn *bun.DB
-
-func initScoreboard() {
-	var ctx context.Context = context.Background()
-	log.Debugf("Initializing scoreboard")
-
-	for team := range conf.Teams {
-		for _, service := range conf.Services {
-			fetchedScore := new(db.ServiceScore)
-			err := conn.NewSelect().Model(fetchedScore).Where("team = ? and service = ?", team, service).Scan(ctx)
-			if err != nil {
-				if err == sql.ErrNoRows {
-					_, err := conn.NewInsert().Model(&db.ServiceScore{
-						Team:    team,
-						Service: service,
-						Score:   conf.InitialServiceScore,
-					}).Exec(ctx)
-					if err != nil {
-						log.Panicf("Error inserting service score %v", err)
-					}
-				} else {
-					log.Panicf("Error fetching service score %v", err)
-				}
-			}
-		}
-	}
-
-}
 
 func main() {
 	var err error

@@ -128,6 +128,12 @@ func elaborateFlags(team string, submittedFlags []string, round uint) []SubResp 
 }
 
 func submitFlags(w http.ResponseWriter, r *http.Request) {
+
+	if conf.GameEndTime != nil && time.Now().After(*conf.GameEndTime) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
 	teamToken := r.Header.Get("X-Team-Token")
 	currentTick := db.GetExposedRound()
 

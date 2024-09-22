@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"net"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -81,13 +82,20 @@ func genCheckFlag(team string, service string, round uint) string {
 }
 
 func runChecker(team string, service string, params *CheckerParams, ctx context.Context) (int, string) {
-	cmd := exec.CommandContext(ctx, "python3", conf.CheckerDir+service+"/checker.py")
+	cmd := exec.CommandContext(ctx, "python3", "checker.py")
 	cmd.Env = append(cmd.Env, "TOKEN="+conf.Token)
 	cmd.Env = append(cmd.Env, "ACTION="+params.Action)
 	cmd.Env = append(cmd.Env, "TEAM_ID="+params.TeamID)
 	cmd.Env = append(cmd.Env, "ROUND="+params.Round)
 	cmd.Env = append(cmd.Env, "FLAG="+params.Flag)
 	cmd.Env = append(cmd.Env, "TERM=xterm")
+
+	workingDir, err := filepath.Abs("../checkers/" + service)
+	if err != nil {
+		log.Criticalf("Error getting working directory for checker %v %v:%v on %v: %v", params.Action, team, params.TeamID, service, err)
+		return CRITICAL, "Checker system error"
+	}
+	cmd.Dir = workingDir
 
 	var outb, errb bytes.Buffer
 	cmd.Stdout = &outb
@@ -97,8 +105,8 @@ func runChecker(team string, service string, params *CheckerParams, ctx context.
 		log.Criticalf("Error running checker %v %v:%v on %v: %v", params.Action, team, params.TeamID, service, err)
 		return CRITICAL, "Checker system error"
 	}
-	err := cmd.Wait()
-	if err == nil {
+
+	if err = cmd.Wait(); err == nil {
 		log.Criticalf("Error checker status %v %v:%v on %v: no exit status", params.Action, team, params.TeamID, service)
 		return CRITICAL, "Checker system error"
 	}
@@ -126,7 +134,7 @@ func runChecker(team string, service string, params *CheckerParams, ctx context.
 	case KILLED:
 		color = log.PURPLE
 	default:
-		log.Warningf("Error unknown checker status %v %v:%v on %v: %v", params.Action, team, params.TeamID, service, exitCode)
+		log.Infof("Checker unknown status %v: %v%v%v from %v:%v on %v", params.Action, color, exitCode, log.END, team, params.TeamID, service)
 		return ERROR, msg
 	}
 
@@ -182,8 +190,20 @@ func checkerRoutine() {
 		teams[i] = ip.String()
 	}
 
+	if conf.GameEndTime != nil && time.Now().After(*conf.GameEndTime) {
+		log.Infof("Game ended")
+		if err := CtfRouteLock(); err != nil {
+			log.Errorf("Error locking routes: %v", err)
+		}
+		return
+	}
+
 	if time.Now().After(conf.GameStartTime) {
 		//Game already started
+		log.Infof("Game already started!")
+		if err := CtfRouteUnlock(); err != nil {
+			log.Errorf("Error unlocking routes: %v", err)
+		}
 		currentRound = uint(time.Since(conf.GameStartTime) / conf.RoundLen)
 	}
 
@@ -198,12 +218,22 @@ func checkerRoutine() {
 		}
 		//Wait for the next round (probably game server restarted)
 		currentRound++
-
 	}
 
 	waitForRound(currentRound) // Wait for the first/next round
+	if err := CtfRouteUnlock(); err != nil {
+		log.Errorf("Error unlocking routes: %v", err)
+	}
+	log.Infof("Starting checker loop with round %v", currentRound)
 
 	for {
+		if conf.GameEndTime != nil && time.Now().After(*conf.GameEndTime) {
+			log.Infof("Game ended")
+			if err := CtfRouteLock(); err != nil {
+				log.Errorf("Error locking routes: %v", err)
+			}
+			break
+		}
 		timeForNextRound := int64(remainingTimeFromRound(currentRound+1)) / int64(time.Millisecond)
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeForNextRound)*time.Millisecond)
 		waitGroup.Add(len(teams) * len(conf.Services))

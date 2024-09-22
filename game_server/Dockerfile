@@ -12,7 +12,7 @@ WORKDIR /app/
 
 RUN apt-get update && \
 	apt-get install -y python3-pip python3-venv \
-		iproute2 iputils-ping
+		iproute2 iputils-ping netcat-openbsd traceroute tcpdump ethtool iptables
 
 COPY ./checkers/requirements.txt /tmp/requirements.txt
 RUN pip install --break-system-packages -r /tmp/requirements.txt
@@ -24,9 +24,10 @@ COPY ./src/go.mod ./src/go.sum /app/src/
 RUN go mod download
 WORKDIR /app/src/
 COPY ./src/ .
+WORKDIR /app/src/
+RUN go build .
 WORKDIR /app/src/frontend
 COPY --from=frontend /app/dist .
 WORKDIR /app/src/
-RUN go build .
 
 ENTRYPOINT [ "/tmp/entry.sh" ]

@@ -8,6 +8,7 @@ type Config = {
     teams: {id: number, name: string, host: string, image: string, nop: boolean}[],
     services: string[],
     start_time: string,
+    end_time?: string,
     round_len: number,
     flag_expire_ticks: number,
     submitter_flags_limit: number,

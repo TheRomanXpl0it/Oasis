@@ -14,12 +14,14 @@ export const RoundCounter = () => {
         currentRound: -1,
         currentRoundPercent: 0,
         hasStarted: false,
-        timeForNextRound: 0
+        timeForNextRound: 0,
+        hasEnded: false
     })
 
     const updateRoundInfo = () => {
         if (config.data == null || config.isFetching) return
         const startGame = new Date(config.data.start_time)
+        const endGame = config.data.end_time != null ? new Date(config.data.end_time) : null
         const now = new Date()
         const roundLen = config.data.round_len
         const nextRoundAt = new Date(startGame.getTime() + (config.data.current_round+2)*roundLen)
@@ -31,7 +33,8 @@ export const RoundCounter = () => {
             currentRound: config.data.current_round,
             currentRoundPercent: nextRoundPercent,
             hasStarted: startGame < now,
-            timeForNextRound: (timeForNextRound <1000?0:timeForNextRound)/1000
+            timeForNextRound: (timeForNextRound <1000?0:timeForNextRound)/1000,
+            hasEnded: endGame != null && endGame < now
         })
     }
 
@@ -47,7 +50,7 @@ export const RoundCounter = () => {
     useEffect(updateRoundInfo, [config.isFetching])
 
     return config.isSuccess?<>
-        <small>{ !roundInfo.hasStarted ? "Game has not started yet" : roundInfo.currentRound==-1 ? "Game has started!" : `Round: ${config.data.current_round} - next round: ${secondDurationToString(roundInfo.timeForNextRound)}` }</small>
-        <Progress size="lg" value={config.data.current_round >= 0?roundInfo.currentRoundPercent:0} color="red"/>
+        <small>{ !roundInfo.hasStarted ? "Game has not started yet" :roundInfo.hasEnded ? "Game has ended!" : roundInfo.currentRound==-1 ? "Game has started!" : `Round: ${config.data.current_round} - next round: ${secondDurationToString(roundInfo.timeForNextRound)}` }</small>
+        <Progress size="lg" value={roundInfo.hasEnded ? 100 : config.data.current_round >= 0?roundInfo.currentRoundPercent:0} color="red"/>
     </>:<Progress size="lg" color="red" value={0}/>
 }

@@ -50,6 +50,20 @@ func GetStartTime() time.Time {
 	return startTime
 }
 
+func SetStartTime(startTime time.Time) {
+	db := ConnectDB()
+	ctx := context.Background()
+	defer db.Close()
+
+	envVar := new(Environment)
+	GetStartTime() // Ensure the start time is created if it doesn't exist in the database
+
+	_, err := db.NewUpdate().Model(envVar).Set("value = ?", startTime.Format(time.RFC3339)).Where("key = ?", "START_TIME").Exec(ctx)
+	if err != nil {
+		log.Panicf("Error updating start time: %v", err)
+	}
+}
+
 func GetExposedRound() int {
 	db := ConnectDB()
 	ctx := context.Background()

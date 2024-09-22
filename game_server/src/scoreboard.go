@@ -252,6 +252,7 @@ type ConfigAPIResponse struct {
 	Teams               []TeamConfig `json:"teams"`
 	Services            []string     `json:"services"`
 	StartTime           string       `json:"start_time"`
+	EndTime             *string      `json:"end_time"`
 	RoundLen            uint         `json:"round_len"`
 	FlagExpireTicks     uint         `json:"flag_expire_ticks"`
 	SubmitterFlagsLimit uint         `json:"submitter_flags_limit"`
@@ -280,10 +281,17 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	var endTime *string = nil
+	if conf.GameEndTime != nil {
+		endTimeStr := conf.GameEndTime.Format(time.RFC3339)
+		endTime = &endTimeStr
+	}
+
 	if err := json.NewEncoder(w).Encode(ConfigAPIResponse{
 		Teams:               teams,
 		Services:            conf.Services,
 		StartTime:           conf.GameStartTime.Format(time.RFC3339),
+		EndTime:             endTime,
 		RoundLen:            uint(conf.RoundLen / time.Millisecond),
 		FlagExpireTicks:     uint(conf.FlagExpireTicks),
 		SubmitterFlagsLimit: uint(conf.MaxFlagsPerRequest),

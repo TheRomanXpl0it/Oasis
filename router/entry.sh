@@ -7,8 +7,6 @@ iptables -o eth+ -t nat -A POSTROUTING -j MASQUERADE
 iptables -o eth+ -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 iptables -o eth+ -A FORWARD -s 10.10.0.0/16 -j ACCEPT
 iptables -o eth+ -A FORWARD -d 10.10.0.1 -j ACCEPT
-iptables -o eth+ -A FORWARD -d 10.10.200.0/24 -j REJECT
-iptables -o eth+ -A FORWARD -s 10.10.200.0/24 -j ACCEPT
 
 for i in $(seq 0 $(($NTEAM-1))) ; do
     #traffic from team to the self-VM is allowed
@@ -23,5 +21,8 @@ echo "Created rules for $NTEAM teams"
 if [[ "$VM_NET_LOCKED" != "n" ]]; then
     ctfroute lock
 fi
+
+rm -f /unixsk/ctfroute.sock
+socat UNIX-LISTEN:/unixsk/ctfroute.sock,reuseaddr,fork EXEC:"bash /ctfroute-handle.sh" &
 
 tail -f /dev/null
