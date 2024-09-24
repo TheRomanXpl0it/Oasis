@@ -85,6 +85,10 @@ def put_flag():
     with open(f'flag_ids/flag_{hashlib.sha1(flag.encode()).hexdigest()}.txt', 'w') as f:
         f.write(str(note_id))
 
+    try:
+        checklib.post_flag_id(service_name, service_addr, note_id)
+    except Exception as e:
+        checklib.quit(checklib.Status.ERROR, "Checker error", str(e))
     checklib.quit(checklib.Status.OK)
 
 

@@ -1,10 +1,10 @@
 package main
 
 import (
+	"game/log"
 	"os"
 	"os/signal"
-
-	"game/log"
+	"syscall"
 )
 
 func main() {
@@ -14,12 +14,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
-	log.SetLogLevel(conf.LogLevel)
 	log.Debugf("Config: %+v\n", conf)
-
-	initRand()
-	initScoreData()
-	initFlagIDs()
 
 	go serveFlagIDs()
 	go serveSubmission()
@@ -28,6 +23,9 @@ func main() {
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
+	signal.Notify(stop, syscall.SIGTERM)
+	signal.Notify(stop, syscall.SIGINT)
+	signal.Notify(stop, syscall.SIGQUIT)
 	log.Infof("Game Server is now running. Press CTRL-C to exit.")
 	<-stop
 }

@@ -1,12 +1,19 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	"game/db"
 	"game/log"
 	"math"
 	"net/http"
+	"sync"
 	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/uptrace/bun"
 )
 
 type SubResp struct {
@@ -15,35 +22,25 @@ type SubResp struct {
 	Status bool   `json:"status"`
 }
 
-func Values[M ~map[K]V, K comparable, V any](m M) []V {
-	r := make([]V, 0, len(m))
-	for _, v := range m {
-		r = append(r, v)
-	}
-	return r
-}
+// Crate a map of lock for each team
+var lockMap map[string]*sync.RWMutex = make(map[string]*sync.RWMutex)
+var lockMappingMutex sync.Mutex
+var lastSubmissionTime map[string]time.Time = make(map[string]time.Time)
+var scoreMutex sync.Mutex
 
-func Contains[T comparable](s []T, e T) bool {
-	for _, v := range s {
-		if v == e {
-			return true
-		}
-	}
-	return false
-}
+var scale float64 = 15 * math.Sqrt(5.0)
+var norm float64 = math.Log(math.Log(5.0)) / 12.0
 
-const maxFlags = 2000
-
-func elaborateFlag(team string, flag string, resp *SubResp) {
-	flags.RLock()
-	info, ok := flags.flags[flag]
-	flags.RUnlock()
-	if !ok {
+func elaborateFlag(team string, flag string, resp *SubResp, round uint) {
+	var ctx context.Context = context.Background()
+	info := new(db.Flag)
+	err := conn.NewSelect().Model(info).Where("id = ?", flag).Scan(ctx)
+	if err != nil {
 		resp.Msg += "Denied: invalid flag"
 		log.Debugf("Flag %s from %s: invalid", flag, team)
 		return
 	}
-	if info.Team == conf.Teams[conf.Nop] {
+	if info.Team == conf.Nop {
 		resp.Msg += "Denied: flag from nop team"
 		log.Debugf("Flag %s from %s: from nop team", flag, team)
 		return
@@ -53,41 +50,70 @@ func elaborateFlag(team string, flag string, resp *SubResp) {
 		log.Debugf("Flag %s from %s: is your own", flag, team)
 		return
 	}
-	if time.Now().After(info.Expire) {
+	if round-info.Round >= uint(conf.FlagExpireTicks) {
 		resp.Msg += "Denied: flag too old"
 		log.Debugf("Flag %s from %s: too old", flag, team)
 		return
 	}
-	stolenFlags.RLock()
-	if stolenFlags.flags[team][info.Service][flag] {
-		stolenFlags.RUnlock()
-		resp.Msg += "Denied: flag already claimed"
-		log.Debugf("Flag %s from %s: already claimed", flag, team)
+
+	flagSubmission := new(db.FlagSubmission)
+	if err = conn.NewSelect().Model(flagSubmission).Where("team = ? and flag_id = ?", team, info.ID).Scan(ctx); err != nil {
+		if err != sql.ErrNoRows {
+			log.Panicf("Error fetching flag submission: %v", err)
+		}
+	} else {
+		resp.Msg += "Denied: flag already submitted"
+		log.Debugf("Flag %s from %s: already submitted", flag, team)
 		return
 	}
-	stolenFlags.RUnlock()
 
-	score.Lock()
-	stolenFlags.Lock()
-	lostFlags.Lock()
+	// Calculate flag points in a db transaction to avoid inconsistencies on db
+	scoreMutex.Lock()
+	var offensePoints float64
+	err = conn.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		attackerScore := new(db.ServiceScore)
+		victimScore := new(db.ServiceScore)
+		if err := conn.NewSelect().Model(attackerScore).Where("team = ? and service = ?", team, info.Service).Scan(ctx); err != nil {
+			return err
+		}
+		if err := conn.NewSelect().Model(victimScore).Where("team = ? and service = ?", info.Team, info.Service).Scan(ctx); err != nil {
+			return err
+		}
+		offensePoints = scale / (1 + math.Exp((math.Sqrt(attackerScore.Score)-math.Sqrt(victimScore.Score))*norm))
+		defensePoints := min(victimScore.Score, offensePoints)
 
-	stolenFlags.flags[team][info.Service][flag] = true
-	lostFlags.flags[info.Team][info.Service][flag] = true
-	offensePoints := scale / (1 + math.Exp((math.Sqrt(score.score[team][info.Service])-math.Sqrt(score.score[info.Team][info.Service]))*norm))
-	defensePoints := min(score.score[info.Team][info.Service], offensePoints)
-	score.score[team][info.Service] += offensePoints
-	score.score[info.Team][info.Service] -= defensePoints
+		_, err = conn.NewInsert().Model(&db.FlagSubmission{
+			FlagID:          info.ID,
+			Team:            team,
+			OffensivePoints: offensePoints,
+			DefensivePoints: defensePoints,
+		}).Exec(ctx)
+		if err != nil {
+			return err
+		}
+		if _, err := conn.NewUpdate().Model(attackerScore).WherePK().Set("score = score + ?", offensePoints).Exec(ctx); err != nil {
+			return err
+		}
+		if _, err := conn.NewUpdate().Model(victimScore).WherePK().Set("score = score - ?", defensePoints).Exec(ctx); err != nil {
+			return err
+		}
 
-	lostFlags.Unlock()
-	stolenFlags.Unlock()
-	score.Unlock()
+		return nil
+	})
+	scoreMutex.Unlock()
+
+	if err != nil {
+		resp.Msg += "Denied: internal error"
+		log.Errorf("Error submitting flag: %v", err)
+		return
+	}
 
 	resp.Status = true
 	resp.Msg += fmt.Sprintf("Accepted: %f flag points", offensePoints)
 	log.Debugf("Flag %s from %s: %.02f flag points", flag, team, offensePoints)
 }
 
-func elaborateFlags(team string, submittedFlags []string) []SubResp {
+func elaborateFlags(team string, submittedFlags []string, round uint) []SubResp {
 	responses := make([]SubResp, 0, len(submittedFlags))
 	for _, flag := range submittedFlags {
 		resp := SubResp{
@@ -95,29 +121,62 @@ func elaborateFlags(team string, submittedFlags []string) []SubResp {
 			Status: false,
 			Msg:    fmt.Sprintf("[%s] ", flag),
 		}
-		elaborateFlag(team, flag, &resp)
+		elaborateFlag(team, flag, &resp, round)
 		responses = append(responses, resp)
 	}
 	return responses
 }
 
 func submitFlags(w http.ResponseWriter, r *http.Request) {
-	team := r.Header.Get("X-Team-Token")
-	if team == "" || !Contains(Values(conf.Teams), team) || team == conf.Teams[conf.Nop] {
+
+	if conf.GameEndTime != nil && time.Now().After(*conf.GameEndTime) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
+	teamToken := r.Header.Get("X-Team-Token")
+	currentTick := db.GetExposedRound()
+
+	if currentTick < 0 {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
+	team := ""
+	for ip, t := range conf.Teams {
+		if t.Token == teamToken {
+			team = ip
+			break
+		}
+	}
+
+	if team == "" || team == conf.Nop {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
+	// Checking if team lock exists, if not create it
+	lockMappingMutex.Lock()
+	if lockMap[team] == nil {
+		lockMap[team] = new(sync.RWMutex)
+	}
+	lockMappingMutex.Unlock()
+	// Locking the team avoiding multiple submission at the same time
+	lockMap[team].Lock()
+	defer lockMap[team].Unlock()
+
 	if conf.SubmitterLimit != nil {
-		lastSubmits.RLock()
-		if last, ok := lastSubmits.times[team]; ok && time.Now().Before(last.Add(time.Duration((*conf.SubmitterLimit)*int64(time.Millisecond)))) {
-			lastSubmits.RUnlock()
-			log.Infof("Submission limit reached for team %s", team)
-			w.WriteHeader(http.StatusTooManyRequests)
-			return
+		//Get last time
+		lastSubmitTime, ok := lastSubmissionTime[team]
+		if ok {
+			//Check if the time has passed
+			if time.Since(lastSubmitTime) < conf.SubmitterLimitTime {
+				log.Infof("Submission limit reached for team %s", team)
+				w.WriteHeader(http.StatusTooManyRequests)
+				return
+			}
 		}
-		lastSubmits.times[team] = time.Now()
-		lastSubmits.RUnlock()
+		lastSubmissionTime[team] = time.Now()
 	}
 
 	var submittedFlags []string
@@ -127,8 +186,8 @@ func submitFlags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	submittedFlags = submittedFlags[:min(len(submittedFlags), maxFlags)]
-	responses := elaborateFlags(team, submittedFlags)
+	submittedFlags = submittedFlags[:min(len(submittedFlags), conf.MaxFlagsPerRequest)]
+	responses := elaborateFlags(team, submittedFlags, uint(currentTick))
 
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(responses); err != nil {
@@ -137,12 +196,16 @@ func submitFlags(w http.ResponseWriter, r *http.Request) {
 }
 
 func serveSubmission() {
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("PUT /flags", submitFlags)
+	router := mux.NewRouter()
+	router.HandleFunc("/flags", submitFlags).Methods("PUT")
 
 	log.Noticef("Starting flag_submission on :8080")
-	if err := http.ListenAndServe("0.0.0.0:8080", mux); err != nil {
-		log.Fatalf("Error serving flag_submission: %v", err)
+	srv := &http.Server{
+		Handler:      router,
+		Addr:         "0.0.0.0:8080",
+		WriteTimeout: 30 * time.Second,
+		ReadTimeout:  30 * time.Second,
 	}
+
+	log.Fatal(srv.ListenAndServe())
 }

@@ -1,21 +1,27 @@
 #/usr/bin/env python3
 
 import argparse, json, os, secrets, shutil
+from datetime import datetime
 
 parser = argparse.ArgumentParser(description='Oasis setup')
 parser.add_argument('--config', type=str, default='oasis-setup-config.json', help='Path to config file')
 parser.add_argument('--wireguard-start-port', type=int, default=51000, help='Wireguard start port')
 parser.add_argument('--clear', action='store_true', help='Clear all data')
-parser.add_argument('--gameserver-log-level', default="debug", help='Log level for game server')
+parser.add_argument('--gameserver-log-level', default="info", help='Log level for game server')
 parser.add_argument('--max-vm-mem', type=str, default="2G", help='Max memory for VMs')
 parser.add_argument('--max-vm-cpus', type=str, default="1", help='Max CPUs for VMs')
 parser.add_argument('--privilaged', action='store_true', help='Use privilaged mode for VMs')
 parser.add_argument('--wireguard-profiles', type=int, default=10, help='Number of wireguard profiles')
-parser.add_argument('--enable-network', action='store_true', help='Enable network')
 parser.add_argument('--dns', type=str, default="1.1.1.1", help='DNS server')
 parser.add_argument('--submission-timeout', type=int, default=10, help='Submission timeout rate limit')
-
+parser.add_argument('--flag-expire-ticks', type=int, default=5, help='Flag expire ticks')
+parser.add_argument('--initial-service-score', type=int, default=5000, help='Initial service score')
+parser.add_argument('--max-flags-per-request', type=int, default=2000, help='Max flags per request')
+parser.add_argument('--debug', action='store_true', help='Debug mode')
+parser.add_argument('--start-time', type=str, help='Start time (ISO 8601)')
+parser.add_argument('--end-time', type=str, help='End time (ISO 8601)')
 args = parser.parse_args()
+
 os.chdir(os.path.abspath(os.path.dirname(__file__)))
 
 data = {}
@@ -63,11 +69,12 @@ def generate_teams_array(data):
             'name': f'Team {i}',
             'token': secrets.token_hex(32),
             'wireguard_port': data['wireguard_start_port']+i,
-            'nop': False
+            'nop': False,
+            'image': "null"
         }
         if i == 0 and data['enable_nop_team']:
             team['nop'] = True
-            team['name'] = 'NOP'
+            team['name'] = 'Nop Team'
         teams.append(team)
     return teams
 
@@ -92,14 +99,20 @@ else:
         exit(1)
     data['wireguard_start_port'] = args.wireguard_start_port
     data['dns'] = args.dns
-    data['enable_network'] = args.enable_network
     data['wireguard_profiles'] = args.wireguard_profiles
     data['docker_privilaged_unsafe'] = args.privilaged
     data['max_vm_cpus'] = args.max_vm_cpus
     data['max_vm_mem'] = args.max_vm_mem
+    data['gameserver_token'] = secrets.token_hex(32)
     data['gameserver_log_level'] = args.gameserver_log_level
+    data['flag_expire_ticks'] = args.flag_expire_ticks
+    data['initial_service_score'] = args.initial_service_score
+    data['max_flags_per_request'] = args.max_flags_per_request
+    data['start_time'] = datetime.fromisoformat(args.start_time).isoformat() if args.start_time else None
+    data['end_time'] = datetime.fromisoformat(args.end_time).isoformat() if args.end_time else None
     data['enable_nop_team'] = input('Enable NOP team? (Y/n): ').lower() != 'n'
     data['server_addr'] = input('Server address: ')
+    
     data['submission_timeout'] = args.submission_timeout
     while True:
         try:
@@ -127,9 +140,11 @@ config = {
                 "net.ipv4.tcp_timestamps=0"
             ],
             "environment": {
-                "NTEAM": len(data['teams']),
-                "VM_NET_LOCKED": "y" if not data['enable_network'] else "n",
+                "NTEAM": len(data['teams'])
             },
+            "volumes": [
+                "unixsk:/unixsk/"
+            ],
             "restart": "unless-stopped",
             "networks": {
                 **{f"vm-team{team['id']}": {
@@ -152,19 +167,60 @@ config = {
 
             }
         },
+         "database": {
+            "hostname": f"oasis-database",
+            "dns": [data['dns']],
+            "image": "postgres",
+            "restart": "unless-stopped",
+            "environment": {
+                "POSTGRES_USER": "oasis",
+                "POSTGRES_PASSWORD": "oasis",
+                "POSTGRES_DB": "oasis"
+            },
+            "volumes": [
+                "./volumes/database/:/var/lib/postgresql/data"
+            ],
+            **({
+                "ports": [
+                    "5432:5432"
+                ]
+            } if args.debug else {}),
+            "networks": {
+                "internalnet": "",
+            }
+        },
         "gameserver": {
             "hostname": f"gameserver",
             "dns": [data['dns']],
             "build": "./game_server",
+            "restart": "unless-stopped",
             "cap_add": [
                 "NET_ADMIN"
             ],
-            "restart": "always",
+            "depends_on": [
+                "router",
+                "database"
+            ],
+            **({
+                "ports": [
+                    "8888:80",
+                    "8080:8080",
+                    "8081:8081"
+                ]
+            } if args.debug else {}),
             "networks": {
+                "internalnet": {
+                    "priority": 1
+                },
                 "gameserver": {
+                    "priority": 10,
                     "ipv4_address": "10.10.0.1"
                 }
-            }
+            },
+            "volumes": [
+                "./game_server/checkers/:/app/checkers/",
+                "unixsk:/unixsk/"
+            ]
         },
         **{
             f"team{team['id']}": {
@@ -180,7 +236,7 @@ config = {
                 **({"privileged": "true"} if data['docker_privilaged_unsafe'] else { "runtime": "sysbox-runc" }),
                 "restart": "unless-stopped",
                 "volumes": [
-                    f"team{team['id']}-root:/root/"
+                    f"./volumes/team{team['id']}-root/:/root/"
                 ],
                 "networks": {
                     f"vm-team{team['id']}": {
@@ -226,7 +282,7 @@ config = {
                     "PGID": 1000,
                     "TZ": "Etc/UTC",
                     "PEERS": data['wireguard_profiles'],
-                    "PEERDNS": "auto",
+                    "PEERDNS": data['dns'],
                     "ALLOWEDIPS": "10.10.0.0/16, 10.60.0.0/16, 10.80.0.0/16",
                     "SERVERURL": data['server_addr'],
                     "SERVERPORT": data['wireguard_start_port']+team['id'],
@@ -236,14 +292,7 @@ config = {
         }
     },
     "volumes": {
-        f"team{team['id']}-root": {
-            "driver": "local",
-            "driver_opts": {
-                "type": "none",
-                "o": "bind",
-                "device": f"./volumes/team{team['id']}-root/"
-            }
-        } for team in data['teams']
+        "unixsk": "",
     },
     "networks": {
         "externalnet": {
@@ -252,6 +301,7 @@ config = {
                 "com.docker.network.bridge.enable_icc": '"false"'
             },
         },
+        "internalnet": "",
         "gameserver": {
             "internal": "true",
             "driver": "macvlan",
@@ -304,11 +354,6 @@ if args.clear:
             shutil.rmtree(f"./wireguard/{file}", ignore_errors=True)
 
 try_mkdir("./volumes")
-for team in data['teams']:
-    try_mkdir(f"./volumes/team{team['id']}-root")
-    if not team['nop']:
-        try_mkdir(f"./wireguard/conf{team['id']}")
-
 
 with open('compose.yml', 'w') as f:
     f.write(dict_to_yaml(config))
@@ -318,17 +363,26 @@ print('Config saved to compose.yml')
 nop_team = data['teams'][0]['id'] if data['enable_nop_team'] else None
 
 gameserver_config = {
-    "log_level": data['gameserver_log_level'],
+    "log_level": data['gameserver_log_level'] if not args.debug else "debug",
     "round_len": data['tick_time']*1000,
-    "token": secrets.token_hex(32),
+    "token": data['gameserver_token'],
     "nop": f"10.60.{nop_team}.1" if not nop_team is None else "null",
     "submitter_limit": data['submission_timeout']*1000,
     "teams": {
-        f"10.60.{team['id']}.1": team['token'] for team in data['teams']
+        **{
+            f"10.60.{team['id']}.1": {
+                "token": team['token'],
+                "name": team['name'],
+                "image": team['image']
+            } for team in data['teams']
+        },
     },
-    "services": [ele for ele in os.listdir('./game_server/checkers') if os.path.isdir(os.path.join('./game_server/checkers', ele))],
-    
-    "checker_dir": "../checkers/"
+    "flag_expire_ticks": data['flag_expire_ticks'],
+    "initial_service_score": data['initial_service_score'],
+    "max_flags_per_request": data['max_flags_per_request'],
+    "start_time": data['start_time'] if data['start_time'] else "null",
+    "end_time": data['end_time'] if data['end_time'] else "null",
+    "debug": "true" if args.debug else "false",
 }
 
 with open('game_server/src/config.yml', 'w') as f:

@@ -22,4 +22,7 @@ if [[ "$VM_NET_LOCKED" != "n" ]]; then
     ctfroute lock
 fi
 
+rm -f /unixsk/ctfroute.sock
+socat UNIX-LISTEN:/unixsk/ctfroute.sock,reuseaddr,fork EXEC:"bash /ctfroute-handle.sh" &
+
 tail -f /dev/null
