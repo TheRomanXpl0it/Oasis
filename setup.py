@@ -246,7 +246,7 @@ config = {
                 "deploy":{
                     "resources":{
                         "limits":{
-                            "cpus": f'"{data['max_vm_cpus']}"',
+                            "cpus": f'"{data["max_vm_cpus"]}"',
                             "memory": data['max_vm_mem']
                         }
                     }
