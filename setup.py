@@ -10,7 +10,7 @@ parser.add_argument('--clear', action='store_true', help='Clear all data')
 parser.add_argument('--gameserver-log-level', default="info", help='Log level for game server')
 parser.add_argument('--max-vm-mem', type=str, default="2G", help='Max memory for VMs')
 parser.add_argument('--max-vm-cpus', type=str, default="1", help='Max CPUs for VMs')
-parser.add_argument('--privileged', action='store_true', help='Use privilaged mode for VMs')
+parser.add_argument('--privileged', action='store_true', help='Use privileged mode for VMs')
 parser.add_argument('--wireguard-profiles', type=int, default=10, help='Number of wireguard profiles')
 parser.add_argument('--dns', type=str, default="1.1.1.1", help='DNS server')
 parser.add_argument('--submission-timeout', type=int, default=10, help='Submission timeout rate limit')
@@ -100,7 +100,7 @@ else:
     data['wireguard_start_port'] = args.wireguard_start_port
     data['dns'] = args.dns
     data['wireguard_profiles'] = args.wireguard_profiles
-    data['docker_privilaged_unsafe'] = args.privilaged
+    data['docker_privileged_unsafe'] = args.privileged
     data['max_vm_cpus'] = args.max_vm_cpus
     data['max_vm_mem'] = args.max_vm_mem
     data['gameserver_token'] = secrets.token_hex(32)
@@ -233,7 +233,7 @@ config = {
                         "TEAM_NAME": team['name'],
                     }
                 },
-                **({"privileged": "true"} if data['docker_privilaged_unsafe'] else { "runtime": "sysbox-runc" }),
+                **({"privileged": "true"} if data['docker_privileged_unsafe'] else { "runtime": "sysbox-runc" }),
                 "restart": "unless-stopped",
                 "volumes": [
                     f"./volumes/team{team['id']}-root/:/root/"
@@ -390,8 +390,8 @@ with open('game_server/src/config.yml', 'w') as f:
 
 print('Game server config saved to game_server/src/config.yml')
 
-if not data['docker_privilaged_unsafe']:
-    print('Please install sysbox! https://github.com/nestybox/sysbox , or use --privilaged flag to use default docker runtime (unsecure)')
+if not data['docker_privileged_unsafe']:
+    print('Please install sysbox! https://github.com/nestybox/sysbox , or use --privileged flag to use default docker runtime (unsecure)')
 
 print('\nUse: "docker compose exec router ctfroute unlock" to start the ctf!')
 
