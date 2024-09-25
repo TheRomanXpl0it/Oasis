@@ -9,6 +9,15 @@
 ## Introduction
 Oasis is an open-source project designed to provide a simple and robust infrastructure for attack and defense simulations. It facilitates cybersecurity training and testing through various components and services.
 
+## Automate me please:
+```bash
+cd vm
+docker build -t oasis-prebuilder -f Dockerfile.prebuilder .
+docker run --privileged --name oasis-prebuilded oasis-prebuilder:latest
+docker commit oasis-prebuilded oasis-vm-base:latest
+```
+
+
 ## Table of Contents
 [Introduction](#introduction)
 [Installation](#installation)
@@ -62,6 +71,8 @@ To manage the game network run:
 ```bash 
 docker compose exec router ctfroute unlock|lock
 ```
+
+This will be automatically handled by the game server. For special cases, you can use this command.
 
 To stop the services run:
 

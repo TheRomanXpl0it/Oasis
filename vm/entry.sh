@@ -4,6 +4,16 @@
 # THIS IS NOT A CHALLENGE, IS THE SETUP OF THE VM #
 ###################################################
 
+while [[ ! $(docker ps) ]]; do
+    sleep 1
+done
+
+if [[ "$1" == "prebuild" ]]; then
+    find /services/ -maxdepth 1 -mindepth 1 -type d -exec docker compose -f {}/compose.yml build \;
+    shutdown -h now
+    exit 0
+fi
+
 mv /services/* /root/ 2> /dev/null
 rm -rf /services
 TEAM_ID=$(ip a | grep -oP '((?<=)10.60.+.1\/24(?=))' | cut -d'.' -f3)
