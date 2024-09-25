@@ -393,5 +393,4 @@ print('Game server config saved to game_server/src/config.yml')
 if not data['docker_privileged_unsafe']:
     print('Please install sysbox! https://github.com/nestybox/sysbox , or use --privileged flag to use default docker runtime (unsecure)')
 
-print('\nUse: "docker compose exec router ctfroute unlock" to start the ctf!')
 

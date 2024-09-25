@@ -337,14 +337,14 @@ func checkerRoutine() {
 							return err
 						}
 
-						if err = conn.NewSelect().Model((*db.FlagSubmission)(nil)).ColumnExpr("count(*)").Join("JOIN flags flag ON flag.id = submit.flag_id").Where("submit.team = ? and flag.service = ?", team, service).Scan(ctx, &statusData.StolenFlags); err != nil {
+						if err = conn.NewSelect().Model((*db.FlagSubmission)(nil)).ColumnExpr("count(*)").Join("JOIN flags flag ON flag.id = submit.flag_id").Where("submit.team = ? and flag.service = ?", team, service).Scan(dbctx, &statusData.StolenFlags); err != nil {
 							if err != sql.ErrNoRows {
 								log.Panicf("Error fetching stolen flags: %v", err)
 								return err
 							}
 						}
 
-						if err = conn.NewSelect().Model((*db.FlagSubmission)(nil)).ColumnExpr("count(*)").Join("JOIN flags flag ON flag.id = submit.flag_id").Where("flag.team = ? and flag.service = ?", team, service).Scan(ctx, &statusData.LostFlags); err != nil {
+						if err = conn.NewSelect().Model((*db.FlagSubmission)(nil)).ColumnExpr("count(*)").Join("JOIN flags flag ON flag.id = submit.flag_id").Where("flag.team = ? and flag.service = ?", team, service).Scan(dbctx, &statusData.LostFlags); err != nil {
 							if err != sql.ErrNoRows {
 								log.Panicf("Error fetching lost flags: %v", err)
 								return err
