@@ -9,6 +9,7 @@ import (
 	"game/log"
 	"math"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,7 +35,7 @@ var norm float64 = math.Log(math.Log(5.0)) / 12.0
 func elaborateFlag(team string, flag string, resp *SubResp, round uint) {
 	var ctx context.Context = context.Background()
 	info := new(db.Flag)
-	err := conn.NewSelect().Model(info).Where("id = ?", flag).Scan(ctx)
+	err := conn.NewSelect().Model(info).Where("id = ?", strings.Trim(flag, " \n\t\r")).Scan(ctx)
 	if err != nil {
 		resp.Msg += "Denied: invalid flag"
 		log.Debugf("Flag %s from %s: invalid", flag, team)
@@ -50,7 +51,7 @@ func elaborateFlag(team string, flag string, resp *SubResp, round uint) {
 		log.Debugf("Flag %s from %s: is your own", flag, team)
 		return
 	}
-	if round-info.Round >= uint(conf.FlagExpireTicks) {
+	if int64(round)-int64(info.Round) >= int64(conf.FlagExpireTicks) {
 		resp.Msg += "Denied: flag too old"
 		log.Debugf("Flag %s from %s: too old", flag, team)
 		return
