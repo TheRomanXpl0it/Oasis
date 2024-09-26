@@ -49,8 +49,6 @@ RUN apt-get update && apt-get install -y curl \
     && rm -rf /var/lib/apt/lists/* \
     && curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh
 
-ADD https://raw.githubusercontent.com/docker/docker-ce/master/components/cli/contrib/completion/bash/docker /etc/bash_completion.d/docker.sh
-
 # Install Sshd
 RUN apt-get update && apt-get install --no-install-recommends -y openssh-server \
     && rm -rf /var/lib/apt/lists/*
@@ -80,7 +78,9 @@ COPY ./entry.sh /usr/bin/_entry_vm_init
 RUN chmod +x /usr/bin/_entry_vm_init
 
 # Create init service
-COPY ./pre-init-vm.service /etc/systemd/system/init-vm.service
+COPY ./init-vm.service /etc/systemd/system/init-vm.service
 RUN systemctl enable init-vm.service
 
-ENTRYPOINT [ "/sbin/init", "--log-level=err" ]
+ADD https://raw.githubusercontent.com/docker/docker-ce/master/components/cli/contrib/completion/bash/docker /etc/bash_completion.d/docker.sh
+
+ENTRYPOINT [ "/usr/bin/_entry_vm_init", "prebuild" ]

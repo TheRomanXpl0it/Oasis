@@ -198,12 +198,15 @@ func checkerRoutine() {
 		return
 	}
 
+	preUnlocked := false
+
 	if time.Now().After(conf.GameStartTime) {
 		//Game already started
 		log.Infof("Game already started!")
 		if err := CtfRouteUnlock(); err != nil {
 			log.Errorf("Error unlocking routes: %v", err)
 		}
+		preUnlocked = true
 		currentRound = uint(time.Since(conf.GameStartTime) / conf.RoundLen)
 	}
 
@@ -221,8 +224,10 @@ func checkerRoutine() {
 	}
 
 	waitForRound(currentRound) // Wait for the first/next round
-	if err := CtfRouteUnlock(); err != nil {
-		log.Errorf("Error unlocking routes: %v", err)
+	if !preUnlocked {
+		if err := CtfRouteUnlock(); err != nil {
+			log.Errorf("Error unlocking routes: %v", err)
+		}
 	}
 	log.Infof("Starting checker loop with round %v", currentRound)
 

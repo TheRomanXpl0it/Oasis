@@ -9,14 +9,6 @@
 ## Introduction
 Oasis is an open-source project designed to provide a simple and robust infrastructure for attack and defense simulations. It facilitates cybersecurity training and testing through various components and services.
 
-## Automate me please:
-```bash
-cd vm
-docker build -t oasis-prebuilder -f Dockerfile.prebuilder .
-docker run --privileged --name oasis-prebuilded oasis-prebuilder:latest
-docker commit oasis-prebuilded oasis-vm-base:latest
-```
-
 
 ## Table of Contents
 [Introduction](#introduction)
@@ -46,14 +38,14 @@ If you can't install sysbox you can still run Oasis but using privileged docker 
 Create compose.yml file:
 
 ```bash
-python3 setup.py
+python3 start.py start
 ```
 
 if you want to use privileged mode, you can use the following command:
 
 ```bash
 #UNSAFE, DON'T SHARE VMs WITH UNTRUSTED USERS
-python3 setup.py --privileged
+python3 setup.py start --privileged
 ```
 
 Build the Docker containers:
@@ -64,12 +56,12 @@ docker compose up -d --build
 
 To connect to the VMs, you need to use one of the wireguard configurations in the wireguard folder.
 
-Instead you can run `docker compose exec team<team_id> bash` to connect to the VMs.
+Instead you can run `python3 start.py compose exec team<team_id> bash` to connect to the VMs.
 
 To manage the game network run:
 
 ```bash 
-docker compose exec router ctfroute unlock|lock
+python3 start.py compose exec router ctfroute unlock|lock
 ```
 
 This will be automatically handled by the game server. For special cases, you can use this command.
@@ -77,8 +69,8 @@ This will be automatically handled by the game server. For special cases, you ca
 To stop the services run:
 
 ```bash
-docker compose down
-py setup.py --clean # Only if you want remove all the volumes and configs
+python3 start.py stop
+python3 start.py --clean # Only if you want remove all the volumes and configs
 ```
 
 ## Usage

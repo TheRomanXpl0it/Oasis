@@ -7,3 +7,5 @@ volumes/**
 volumes/
 
 compose.yml
+
+oasis-compose-tmp-file.yml
