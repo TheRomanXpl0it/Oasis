@@ -45,6 +45,21 @@ find /root/ -maxdepth 1 -mindepth 1 -type d -print0 | while read -d $'\0' path
 do
     if [[ -f "$path/compose.yml" || -f "$path/compose.yaml" || -f "$path/docker-compose.yml" || -f "$path/docker-compose.yaml" ]]; then
         cd $path
+        if [[ -f "$path/predeploy.sh" ]]; then
+            echo "Executing predeploy.sh"
+            bash predeploy.sh
+        fi
         docker compose up -d --build >> /tmp/service-init-logs
     fi
 done
+
+# Pre Deploy script can be useful to run some commands before the deployment of the services
+# Eg.
+
+# #!/usr/bin/bash
+# cd $(dirname "$(readlink -f $0)")
+# if [[ ! -f ".env" ]]; then
+#     echo "SECRET_KEY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)" > .env
+# fi
+
+#To generate an .env file with a random SECRET_KEY different for each team

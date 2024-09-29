@@ -1,10 +1,12 @@
 import sys
 from enum import Enum
 import requests
-import os
+import os, hashlib, json
 
-TOKEN = os.getenv("TOKEN", "5d46276c259b7fa846b6d2ed6d575e6b")
+TOKEN = os.getenv("TOKEN")
 
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+os.makedirs('flag_ids', exist_ok=True)
 
 class Status(Enum):
     OK = 101
@@ -20,6 +22,13 @@ class Action(Enum):
     def __str__(self):
         return str(self.value)
 
+def save_flag_data(flag:str, data):
+    with open(f'flag_ids/flag_{hashlib.sha256(flag.encode()).hexdigest()}.txt', 'w') as f:
+        f.write(json.dumps(data))
+
+def get_flag_data(flag:str):
+    with open(f'flag_ids/flag_{hashlib.sha256(flag.encode()).hexdigest()}.txt', 'r') as f:
+        return json.loads(f.read())
 
 def get_data():
     data = {
@@ -38,8 +47,8 @@ def quit(exit_code, comment='', debug=''):
     if isinstance(exit_code, Status):
         exit_code = exit_code.value
 
-    print(comment)
-    print(debug, file=sys.stderr)
+    print(debug)
+    print(comment, file=sys.stderr)
     exit(exit_code)
 
 

@@ -421,6 +421,8 @@ def clear_volumes():
     remove_prebuilded()
     remove_prebuilder()
     remove_prebuilt()
+    for service in os.listdir("./game_server/checkers"):
+        shutil.rmtree(f"./game_server/checkers/{service}/flag_ids", ignore_errors=True)
 
 def try_mkdir(path):
     try:
