@@ -683,6 +683,9 @@ def main():
 
     
     if args.clear:
+        if check_already_running():
+            puts(f"{g.name} is running! please stop it before clear the data", color=colors.red)
+            exit(1)
         clear_data()
         puts(f"Volumes and config clean!", color=colors.green, is_bold=True)
 

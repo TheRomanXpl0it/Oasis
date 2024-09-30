@@ -1,0 +1,9 @@
+services:
+  web:
+    build: ./
+    restart: unless-stopped
+    volumes:
+      - ../oasis-setup-config.json:/app/oasis-setup-config.json
+      - ../wireguard:/app/wireguard
+    ports:
+      - "4040:4040"

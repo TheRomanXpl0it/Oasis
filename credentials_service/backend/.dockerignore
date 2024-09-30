@@ -1,0 +1,10 @@
+__pycache__
+*.pyc
+*.pyo
+.env
+Dockerfile.api
+.dockerignore
+.git
+/oasis-setup-config.json
+/teams_data.json.lock
+

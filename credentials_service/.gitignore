@@ -1,0 +1,6 @@
+.env
+__pycache__
+.pytest_chache
+.vscode
+/backend/teams_data.json.lock
+/backend/teams_data.json

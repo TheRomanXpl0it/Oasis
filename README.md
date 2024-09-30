@@ -69,8 +69,7 @@ This will be automatically handled by the game server. For special cases, you ca
 To stop the services run:
 
 ```bash
-python3 start.py stop
-python3 start.py --clean # Only if you want remove all the volumes and configs
+python3 start.py stop --clean # Only if you want remove all the volumes and configs
 ```
 
 ## Usage
