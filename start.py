@@ -129,7 +129,7 @@ def gen_args(args_to_parse: list[str]|None = None):
     
     parser.add_argument('--clear', dest="bef_clear", required=False, action="store_true", help=f'Delete volumes folder associated to {g.name} and oasis json config', default=False)
 
-    subcommands = parser.add_subparsers(dest="command", help="Command to execute")
+    subcommands = parser.add_subparsers(dest="command", help="Command to execute", required=True)
     
     #Compose Command
     parser_compose = subcommands.add_parser('compose', help='Run docker compose command')
@@ -138,7 +138,8 @@ def gen_args(args_to_parse: list[str]|None = None):
     #Start Command
     parser_start = subcommands.add_parser('start', help=f'Start {g.name}')
     parser_start.add_argument('--logs', required=False, action="store_true", help=f'Show {g.name} logs', default=False)
-    parser_start.add_argument('--regen', required=False, action="store_true", help=f'Regenerate VM base image and configuration', default=False)
+    parser_start.add_argument('--reset', required=False, action="store_true", help=f'Regenerate VM base image and configuration', default=False)
+    parser_start.add_argument('--rebuild-vm', required=False, action="store_true", help=f'Rebuild VM base image', default=False)
     #Gameserve options
     parser_start.add_argument('--wireguard-start-port', type=int, default=51000, help='Wireguard start port')
     parser_start.add_argument('--gameserver-log-level', default="info", help='Log level for game server')
@@ -153,8 +154,9 @@ def gen_args(args_to_parse: list[str]|None = None):
     parser_start.add_argument('--start-time', type=str, help='Start time (ISO 8601)')
     parser_start.add_argument('--end-time', type=str, help='End time (ISO 8601)')
     #init options
-    parser_start.add_argument('--privileged', action='store_true', help='Use privileged mode for VMs')
-    parser_start.add_argument('--debug', action='store_true', help='Debug mode')
+    parser_start.add_argument('--privileged', '-P', action='store_true', help='Use privileged mode for VMs')
+    parser_start.add_argument('--debug', '-D', action='store_true', help='Debug mode')
+    parser_start.add_argument('--config-only', '-C', action='store_true', help='Only generate config file')
 
 
     #Stop Command
@@ -163,6 +165,9 @@ def gen_args(args_to_parse: list[str]|None = None):
     
     parser_restart = subcommands.add_parser('restart', help=f'Restart {g.name}')
     parser_restart.add_argument('--logs', required=False, action="store_true", help=f'Show {g.name} logs', default=False)
+    parser_restart.add_argument('--privileged', '-P', action='store_true', help='Use privileged mode for VMs')
+    parser_restart.add_argument('--debug', '-D', action='store_true', help='Debug mode')
+    
     args = parser.parse_args(args=args_to_parse)
     
     if not "clear" in args:
@@ -411,18 +416,43 @@ def try_to_remove(file):
     except FileNotFoundError:
         pass
 
-def clear_volumes():
-    shutil.rmtree("./volumes", ignore_errors=True)
-    for file in os.listdir("./wireguard"):
-        if file.startswith("conf"):
-            shutil.rmtree(f"./wireguard/{file}", ignore_errors=True)
-    try_to_remove(g.config_file)
-    try_to_remove(g.gammeserver_config_file)
-    remove_prebuilded()
-    remove_prebuilder()
-    remove_prebuilt()
-    for service in os.listdir("./game_server/checkers"):
-        shutil.rmtree(f"./game_server/checkers/{service}/flag_ids", ignore_errors=True)
+def clear_data(
+    remove_config=True,
+    remove_prebuilded_container=True,
+    remove_prebuilder_image=True,
+    remove_prebuilt_image=True,
+    remove_wireguard=True,
+    remove_checkers_data=True,
+    remove_gameserver_config=True,
+    remove_gameserver_data=True,
+    remove_vm_data=True,
+    
+):
+    if remove_vm_data and remove_gameserver_data:
+        shutil.rmtree("./volumes", ignore_errors=True)
+    elif remove_vm_data:
+        for folder in os.listdir("./volumes"):
+            if folder.startswith("team"):
+                shutil.rmtree(f"./volumes/{folder}", ignore_errors=True)
+    elif remove_gameserver_data:
+        shutil.rmtree("./volumes/database", ignore_errors=True)
+    if remove_wireguard:
+        for file in os.listdir("./wireguard"):
+            if file.startswith("conf"):
+                shutil.rmtree(f"./wireguard/{file}", ignore_errors=True)
+    if remove_config:
+        try_to_remove(g.config_file)
+    if remove_gameserver_config:
+        try_to_remove(g.gammeserver_config_file)
+    if remove_prebuilded_container:
+        remove_prebuilded()
+    if remove_prebuilder_image:
+        remove_prebuilder()
+    if remove_prebuilt_image:
+        remove_prebuilt()
+    if remove_checkers_data:
+        for service in os.listdir("./game_server/checkers"):
+            shutil.rmtree(f"./game_server/checkers/{service}/flag_ids", ignore_errors=True)
 
 def try_mkdir(path):
     try:
@@ -521,8 +551,7 @@ def config_input():
     data['teams'] = generate_teams_array(data)
     return data
 
-def input_and_create_config():
-    data = config_input()
+def create_config(data):
     with open(g.config_file, 'w') as f:
         json.dump(data, f, indent=4)
     return data
@@ -580,17 +609,26 @@ def main():
                 if check_already_running():
                     puts(f"{g.name} is already running! use --help to see options useful to manage {g.name} execution", color=colors.yellow)
                 else:
-                    if args.regen or not config_exists():
-                        puts("Clearing old volumes and config", color=colors.yellow)
-                        clear_volumes()
-                        config = input_and_create_config()
-                        write_gameserver_config(config)
+                    if args.reset or not config_exists() or args.config_only:
+                        config = config_input()
+                        create_config(config)
+                    else:
+                        config = read_config()
+                    if args.config_only:
+                        puts(f"Config file generated!, you can customize editing {g.config_file}", color=colors.green)
+                        return
+                    if args.reset or args.rebuild_vm:
+                        puts("Clearing old setup images and volumes", color=colors.yellow)
+                        clear_data(remove_config=False)
+                    write_gameserver_config(config)
                     if not prebuilt_exists():
-                        puts("Prebuilt image not found!", color=colors.yellow)
-                        puts("Clearing old setup images", color=colors.yellow)
-                        #If these images exists, we need to remove them to avoid errors
-                        remove_prebuilder()
-                        remove_prebuilded()
+                        if not (args.reset or args.rebuild_vm):
+                            puts("Prebuilt image not found!", color=colors.yellow)
+                            puts("Clearing old setup images...", color=colors.yellow)
+                            #If these images exists, we need to remove them to avoid errors
+                            remove_prebuilder()
+                            remove_prebuilded()
+                            remove_prebuilt()
                         puts("Building the prebuilder image", color=colors.yellow)
                         if not build_prebuilder():
                             puts("Error building prebuilder image", color=colors.red)
@@ -606,8 +644,10 @@ def main():
                         puts("Clear unused images", color=colors.yellow)
                         remove_prebuilder()
                         remove_prebuilded()
+                    
                     if not config_exists():
                         puts(f"Config file not found! please run {sys.argv[0]} start", color=colors.red)
+                    
                     else:
                         puts(f"{g.name} is starting!", color=colors.yellow)
                         write_compose(read_config())
@@ -643,8 +683,8 @@ def main():
 
     
     if args.clear:
-        clear_volumes()
-        puts(f"Volumes and config cleared!", color=colors.green, is_bold=True)
+        clear_data()
+        puts(f"Volumes and config clean!", color=colors.green, is_bold=True)
 
     if "logs" in args and args.logs:
         if config_exists():
