@@ -82,8 +82,7 @@ def put_flag():
     note_title = names.get_random_name()
     note_id = create_note(note_title, flag, True)
 
-    with open(f'flag_ids/flag_{hashlib.sha1(flag.encode()).hexdigest()}.txt', 'w') as f:
-        f.write(str(note_id))
+    checklib.save_flag_data(flag, note_id)
 
     try:
         checklib.post_flag_id(service_name, service_addr, note_id)
@@ -94,9 +93,8 @@ def put_flag():
 
 def get_flag():
     flag = data['flag']
-
-    with open(f'flag_ids/flag_{hashlib.sha1(flag.encode()).hexdigest()}.txt', 'r') as f:
-        note_id = int(f.read())
+    
+    note_id = checklib.get_flag_data(flag)
 
     _, note_content = view_note(note_id)
     if note_content != flag:

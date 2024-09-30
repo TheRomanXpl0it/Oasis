@@ -1,11 +1,6 @@
 __pycache__/
-
-oasis-setup-config.json
-
-volumes/**
-
-volumes/
-
-compose.yml
-
-oasis-compose-tmp-file.yml
+/oasis-setup-config.json
+/volumes/**
+/volumes/
+/compose.yml
+/oasis-compose-tmp-file.yml
