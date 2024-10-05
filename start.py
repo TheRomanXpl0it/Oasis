@@ -232,7 +232,7 @@ def write_compose(data):
                 "database": {
                     "hostname": f"oasis-database",
                     "dns": [data['dns']],
-                    "image": "postgres",
+                    "image": "postgres:17",
                     "restart": "unless-stopped",
                     "environment": {
                         "POSTGRES_USER": "oasis",
