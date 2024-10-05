@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import hashlib
 import os
 import random
 import string
@@ -14,9 +13,7 @@ import checklib
 
 data = checklib.get_data()
 action = data['action']
-team_id = data['teamId']
-service_addr = '10.60.' + team_id + '.1'
-service_name = 'Notes'
+service_addr = data['host']
 
 os.makedirs('flag_ids', exist_ok=True)
 
@@ -85,7 +82,7 @@ def put_flag():
     checklib.save_flag_data(flag, note_id)
 
     try:
-        checklib.post_flag_id(service_name, service_addr, note_id)
+        checklib.post_flag_id(note_id)
     except Exception as e:
         checklib.quit(checklib.Status.ERROR, "Checker error", str(e))
     checklib.quit(checklib.Status.OK)

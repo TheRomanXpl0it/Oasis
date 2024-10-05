@@ -63,7 +63,7 @@ export const ServiceScoreData = ({ score }: { score?: TeamServiceScore }) => {
                         py={4} px={12}
                         style={{ backgroundColor: score.get_flag == 101 ? "green": "red", borderTopRightRadius: 6, borderBottomRightRadius: 6 }}
                         className="center-flex"
-                        onClick={()=>showDetailModal(`GET FLAG on ${score.service}`, score.put_flag_msg)}
+                        onClick={()=>showDetailModal(`GET FLAG on ${score.service}`, score.get_flag_msg)}
                     >
                         <FaSearch size={14} />
                     </Box>

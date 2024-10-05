@@ -48,9 +48,13 @@ export const ScoreboardPage = () => {
         return a.team.localeCompare(b.team)
     }).map((teamData, pos) => {
         const teamInfo = teamSolver(teamData.team)
-        return <Table.Tr key={teamData.team} onClick={()=>navigate(`/scoreboard/team/${teamInfo?.id}`)}>
-            <Table.Td><Box className="center-flex">{pos + 1}</Box></Table.Td>
-            <Table.Td><Box className="center-flex" style={{ width: "100%"}}>
+        const redirectProps = {
+            onClick: () => navigate(`/scoreboard/team/${teamInfo?.id}`),
+            style: { cursor: "pointer" }
+        }
+        return <Table.Tr key={teamData.team}>
+            <Table.Td {...redirectProps}><Box className="center-flex">{pos + 1}</Box></Table.Td>
+            <Table.Td {...redirectProps}><Box className="center-flex" style={{ width: "100%"}}>
                 <Image
                     src={"/images/teams/"+(teamInfo?.image == "" || teamInfo == null ?"oasis-player.png":teamInfo.image)}
                     alt={teamData.team}

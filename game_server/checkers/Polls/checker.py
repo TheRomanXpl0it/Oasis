@@ -10,23 +10,16 @@ import json
 import re
 os.environ["PWNLIB_NOTERM"] = "1"
 
-
 context.timeout = 5
 context.log_level = "error"
 
 data = checklib.get_data()
 action = data['action']
+team_addr = data['host']
 port = 5000
-service_name = 'Polls'
-
-team_id = data['teamId']
-team_addr = '10.60.' + team_id + '.1'
-# team_addr = "localhost"
-
 
 def get_random_string(n, alph=string.ascii_letters+string.digits):
     return ''.join([random.choice(alph) for _ in range(n)])
-
 
 def check_sla():
     try:
@@ -215,12 +208,11 @@ def put_flag():
     except Exception as e:
         checklib.quit(checklib.Status.DOWN, "Cannot create poll", str(e))
 
-    #'''
     try:
-        checklib.post_flag_id(service_name, team_addr, {"poll_id": poll_id, "username": user})
+        checklib.post_flag_id({"poll_id": poll_id, "username": user})
     except Exception as e:
         checklib.quit(checklib.Status.ERROR, "Checker error", str(e))
-    #'''
+    
     checklib.quit(checklib.Status.OK)
 
 

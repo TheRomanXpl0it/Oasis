@@ -9,8 +9,6 @@ from werkzeug.security import safe_join
 
 load_dotenv()
 
-
-
 frontend_folder = os.path.join(BASE_DIR, "frontend") if not DEBUG else os.path.join(BASE_DIR, "../frontend/dist")
 
 app = Flask(__name__)
