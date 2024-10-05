@@ -43,6 +43,7 @@ export const UserLogin = () => {
                     size="md"
                     length={6}
                     type="number"
+                    mask
                     {...form.getInputProps('pin')}
                 />
                 <Space h="sm" />
