@@ -4,6 +4,7 @@ import requests
 import os, hashlib, json
 
 TOKEN = os.getenv("TOKEN")
+SERVICE = os.getenv('SERVICE')
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 os.makedirs('flag_ids', exist_ok=True)
@@ -30,11 +31,15 @@ def get_flag_data(flag:str):
     with open(f'flag_ids/flag_{hashlib.sha256(flag.encode()).hexdigest()}.txt', 'r') as f:
         return json.loads(f.read())
 
+def get_host():
+    return '10.60.' + os.environ['TEAM_ID'] + '.1'
+
 def get_data():
     data = {
         'action': os.environ['ACTION'],
         'teamId': os.environ['TEAM_ID'],
-        'round': os.environ['ROUND']
+        'round': os.environ['ROUND'],
+        'host': get_host()
     }
 
     if data['action'] == Action.PUT_FLAG.name or data['action'] == Action.GET_FLAG.name:
@@ -47,16 +52,16 @@ def quit(exit_code, comment='', debug=''):
     if isinstance(exit_code, Status):
         exit_code = exit_code.value
 
-    print(debug)
-    print(comment, file=sys.stderr)
+    print(comment)
+    print(debug, file=sys.stderr)
     exit(exit_code)
 
 
-def post_flag_id(service_id, team_id, flag_id):
+def post_flag_id(flag_id):
     requests.post('http://flagid:8081/postFlagId', json={
         'token': TOKEN,
-        'serviceId': service_id,
-        'teamId': team_id,
+        'serviceId': SERVICE,
+        'teamId': get_host(),
         'round': int(os.environ['ROUND']),
         'flagId': flag_id
     })

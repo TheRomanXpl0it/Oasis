@@ -88,6 +88,7 @@ func runChecker(team string, service string, params *CheckerParams, ctx context.
 	cmd.Env = append(cmd.Env, "TEAM_ID="+params.TeamID)
 	cmd.Env = append(cmd.Env, "ROUND="+params.Round)
 	cmd.Env = append(cmd.Env, "FLAG="+params.Flag)
+	cmd.Env = append(cmd.Env, "SERVICE="+service)
 	cmd.Env = append(cmd.Env, "TERM=xterm")
 
 	workingDir, err := filepath.Abs("../checkers/" + service)
@@ -111,9 +112,9 @@ func runChecker(team string, service string, params *CheckerParams, ctx context.
 		return CRITICAL, "Checker system error"
 	}
 
-	msg := errb.String()
+	msg := outb.String()
 
-	log.Debugf("Checker %v %v:%v on %v output: %v", params.Action, team, params.TeamID, service, outb.String())
+	log.Infof("Checker %v %v:%v on %v output: %v", params.Action, team, params.TeamID, service, errb.String())
 
 	exiterr, ok := err.(*exec.ExitError)
 	if !ok {
