@@ -29,7 +29,7 @@ export type LoginInfo = {
 }
 
 const getUrl = (path: string) => {
-    const prefix = import.meta.env.DEV ? "http://localhost:1234/api" : "/api"
+    const prefix = import.meta.env.DEV ? "http://localhost:4040/api" : "/api"
     return prefix + path
 }
 

@@ -10,7 +10,7 @@ import (
 func main() {
 	var err error
 
-	conf, err = LoadConfig("config.yml")
+	conf, err = LoadConfig("../config.yml")
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}

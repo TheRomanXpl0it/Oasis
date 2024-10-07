@@ -14,7 +14,7 @@ class g:
     compose_project_name = "oasis"
     name = "Oasis"
     config_file = "oasis-setup-config.json"
-    gammeserver_config_file = "game_server/src/config.yml"
+    gammeserver_config_file = "game_server/config.yml"
     prebuild_image = "oasis-prebuilder"
     prebuilded_container = "oasis-prebuilded"
     prebuilt_image = "oasis-vm-base"
@@ -75,52 +75,57 @@ def check_if_exists(program, get_output=False, print_output=False, no_stderr=Fal
 def composecmd(cmd, composefile=None):
     if composefile:
         cmd = f"-f {composefile} {cmd}"
-    if not check_if_exists("docker ps"):
-        return puts("Cannot use docker, the user hasn't the permission or docker isn't running", color=colors.red)
-    elif check_if_exists("docker compose"):
-        return os.system(f"docker compose -p {g.compose_project_name} {cmd}")
-    elif check_if_exists("docker-compose"):
-        return os.system(f"docker-compose -p {g.compose_project_name} {cmd}")
+    if not check_if_exists("podman --version"):
+        return puts("Podman not found! please install podman!", color=colors.red)
+    elif not check_if_exists("podman ps"):
+        return puts("Cannot use podman, the user hasn't the permission or podman isn't running", color=colors.red)
+    elif check_if_exists("podman compose --version"):
+        return os.system(f"podman compose -p {g.compose_project_name} {cmd}")
+    elif check_if_exists("podman-compose --version"):
+        return os.system(f"podman-compose -p {g.compose_project_name} {cmd}")
     else:
-        puts("Docker compose not found! please install docker compose!", color=colors.red)
+        return puts("Podman compose not found! please install podman compose!", color=colors.red)
 
 def dockercmd(cmd):
-    if check_if_exists("docker"):
-        return os.system(f"docker {cmd}")
-    elif not check_if_exists("docker ps"):
-        puts("Cannot use docker, the user hasn't the permission or docker isn't running", color=colors.red)
+    if check_if_exists("podman --version"):
+        return os.system(f"podman {cmd}")
+    elif not check_if_exists("podman ps"):
+        puts("Cannot use podman, the user hasn't the permission or podman isn't running", color=colors.red)
     else:
-        puts("Docker not found! please install docker!", color=colors.red)
+        puts("Podman not found! please install podman!", color=colors.red)
 
 def check_already_running():
-    return g.container_name in check_if_exists(f'docker ps --filter "name=^{g.container_name}$"', get_output=True)
+    return g.container_name in check_if_exists(f'podman ps --filter "name=^{g.container_name}$"', get_output=True)
 
 def prebuilder_exists():
-    return g.prebuild_image in check_if_exists(f'docker image ls --filter "reference={g.prebuild_image}"', get_output=True)
+    return g.prebuild_image in check_if_exists(f'podman image ls --filter "reference={g.prebuild_image}"', get_output=True)
 
 def prebuilt_exists():
-    return g.prebuilt_image in check_if_exists(f'docker image ls --filter "reference={g.prebuilt_image}"', get_output=True)
+    return g.prebuilt_image in check_if_exists(f'podman image ls --filter "reference={g.prebuilt_image}"', get_output=True)
 
 def remove_prebuilder():
-    return check_if_exists(f'docker image rm {g.prebuild_image}')
+    return check_if_exists(f'podman image rm {g.prebuild_image}')
 
 def remove_prebuilt():
-    return check_if_exists(f'docker image rm {g.prebuilt_image}')
+    return check_if_exists(f'podman image rm {g.prebuilt_image}')
 
 def remove_prebuilded():
-    return check_if_exists(f'docker container rm {g.prebuilded_container}')
+    return check_if_exists(f'podman container rm {g.prebuilded_container}')
+
+def remove_database_volume():
+    return check_if_exists(f'podman volume rm oasis_oasis-postgres-db')
 
 def build_prebuilder():
-    return check_if_exists(f'docker build -t {g.prebuild_image} -f ./vm/Dockerfile.prebuilder ./vm/', print_output=True)
+    return check_if_exists(f'podman build -t {g.prebuild_image} -f ./vm/Dockerfile.prebuilder ./vm/', print_output=True)
 
 def build_prebuilt():
-    return check_if_exists(f'docker run -it --privileged --name {g.prebuilded_container} {g.prebuild_image}', print_output=True)
+    return check_if_exists(f'podman run -it --device /dev/fuse --security-opt label=disable --security-opt unmask=ALL --name {g.prebuilded_container} {g.prebuild_image}', print_output=True)
 
 def kill_builder():
-    return check_if_exists(f'docker kill {g.prebuilded_container}', no_stderr=True)
+    return check_if_exists(f'podman kill {g.prebuilded_container}', no_stderr=True)
 
 def commit_prebuilt():
-    return check_if_exists(f'docker commit {g.prebuilded_container} {g.prebuilt_image}', print_output=True)
+    return check_if_exists(f'podman commit {g.prebuilded_container} {g.prebuilt_image}', print_output=True)
 
 def gen_args(args_to_parse: list[str]|None = None):                     
     
@@ -132,20 +137,20 @@ def gen_args(args_to_parse: list[str]|None = None):
     subcommands = parser.add_subparsers(dest="command", help="Command to execute", required=True)
     
     #Compose Command
-    parser_compose = subcommands.add_parser('compose', help='Run docker compose command')
-    parser_compose.add_argument('compose_args', nargs=argparse.REMAINDER, help='Arguments to pass to docker compose', default=[])
+    parser_compose = subcommands.add_parser('compose', help='Run podman compose command')
+    parser_compose.add_argument('compose_args', nargs=argparse.REMAINDER, help='Arguments to pass to podman compose', default=[])
     
     #Start Command
     parser_start = subcommands.add_parser('start', help=f'Start {g.name}')
     parser_start.add_argument('--logs', required=False, action="store_true", help=f'Show {g.name} logs', default=False)
     parser_start.add_argument('--reset', required=False, action="store_true", help=f'Regenerate VM base image and configuration', default=False)
-    parser_start.add_argument('--rebuild-vm', required=False, action="store_true", help=f'Rebuild VM base image', default=False)
+    parser_start.add_argument('--rebuild', required=False, action="store_true", help=f'Rebuild VM base image', default=False)
     #Gameserve options
     parser_start.add_argument('--wireguard-start-port', type=int, default=51000, help='Wireguard start port')
     parser_start.add_argument('--gameserver-log-level', default="info", help='Log level for game server')
     parser_start.add_argument('--max-vm-mem', type=str, default="2G", help='Max memory for VMs')
     parser_start.add_argument('--max-vm-cpus', type=str, default="1", help='Max CPUs for VMs')
-    parser_start.add_argument('--wireguard-profiles', type=int, default=10, help='Number of wireguard profiles')
+    parser_start.add_argument('--wireguard-profiles', type=int, default=30, help='Number of wireguard profiles')
     parser_start.add_argument('--dns', type=str, default="1.1.1.1", help='DNS server')
     parser_start.add_argument('--submission-timeout', type=int, default=10, help='Submission timeout rate limit')
     parser_start.add_argument('--flag-expire-ticks', type=int, default=5, help='Flag expire ticks')
@@ -153,31 +158,42 @@ def gen_args(args_to_parse: list[str]|None = None):
     parser_start.add_argument('--max-flags-per-request', type=int, default=2000, help='Max flags per request')
     parser_start.add_argument('--start-time', type=str, help='Start time (ISO 8601)')
     parser_start.add_argument('--end-time', type=str, help='End time (ISO 8601)')
+    parser_start.add_argument('--max-disk-size', type=str, default="30G", help='Max disk size for VMs')
     #init options
     parser_start.add_argument('--privileged', '-P', action='store_true', help='Use privileged mode for VMs')
-    parser_start.add_argument('--debug', '-D', action='store_true', help='Debug mode')
+    parser_start.add_argument('--expose-gameserver', '-E', action='store_true', help='Expose gameserver port')
+    parser_start.add_argument('--gameserver-port', default="127.0.0.1:8888", help='Gameserver port')
     parser_start.add_argument('--config-only', '-C', action='store_true', help='Only generate config file')
+    parser_start.add_argument('--disk-limit', '-D', action='store_true', help='Limit disk size for VMs')
 
 
     #Stop Command
     parser_stop = subcommands.add_parser('stop', help=f'Stop {g.name}')
-    parser_stop.add_argument('--clear', required=False, action="store_true", help=f'Delete docker volume associated to {g.name} resetting all the settings', default=False)
+    parser_stop.add_argument('--clear', required=False, action="store_true", help=f'Delete podman volume associated to {g.name} resetting all the settings', default=False)
     
     parser_restart = subcommands.add_parser('restart', help=f'Restart {g.name}')
     parser_restart.add_argument('--logs', required=False, action="store_true", help=f'Show {g.name} logs', default=False)
     parser_restart.add_argument('--privileged', '-P', action='store_true', help='Use privileged mode for VMs')
-    parser_restart.add_argument('--debug', '-D', action='store_true', help='Debug mode')
+    parser_restart.add_argument('--disk-limit', '-D', action='store_true', help='Limit disk size for VMs')
+    parser_restart.add_argument('--expose-gameserver', '-E', action='store_true', help='Expose gameserver port')
+    parser_restart.add_argument('--gameserver-port', default="127.0.0.1:8888", help='Gameserver port')
     
     args = parser.parse_args(args=args_to_parse)
     
     if not "clear" in args:
         args.clear = False
-        
-    if not "debug" in args:
-        args.debug = False
 
     if not "privileged" in args:
         args.privileged = False
+        
+    if not "expose_gameserver" in args:
+        args.expose_gameserver = False
+        
+    if not "gameserver_port" in args:
+        args.gameserver_port = "127.0.0.1:8888"
+    
+    if not "disk_limit" in args:
+        args.disk_limit = False
         
     args.clear = args.bef_clear or args.clear
 
@@ -240,13 +256,8 @@ def write_compose(data):
                         "POSTGRES_DB": "oasis"
                     },
                     "volumes": [
-                        "./volumes/database/:/var/lib/postgresql/data"
+                        "oasis-postgres-db:/var/lib/postgresql/data"
                     ],
-                    **({
-                        "ports": [
-                            "5432:5432"
-                        ]
-                    } if args.debug else {}),
                     "networks": {
                         "internalnet": "",
                     }
@@ -260,17 +271,15 @@ def write_compose(data):
                     "cap_add": [
                         "NET_ADMIN"
                     ],
+                    **({
+                        "ports": [
+                            f"{args.gameserver_port}:80"
+                        ]
+                    } if args.expose_gameserver else {}),
                     "depends_on": [
                         "router",
                         "database"
                     ],
-                    **({
-                        "ports": [
-                            "8888:80",
-                            "8080:8080",
-                            "8081:8081"
-                        ]
-                    } if args.debug else {}),
                     "networks": {
                         "internalnet": {
                             "priority": 1
@@ -281,26 +290,45 @@ def write_compose(data):
                         }
                     },
                     "volumes": [
-                        "./game_server/checkers/:/app/checkers/",
-                        "unixsk:/unixsk/"
+                        "./game_server/checkers/:/app/checkers/:z",
+                        "unixsk:/unixsk/:z",
+                        "./game_server/config.yml:/app/config.yml:z"
                     ]
                 },
                 **{
                     f"team{team['id']}": {
                         "hostname": f"team{team['id']}",
                         "dns": [data['dns']],
+                        "cap_add": [
+                            "SYS_ADMIN",
+                            "SYS_MODULE",
+                            "NET_ADMIN",
+                            "NET_RAW",
+                            "SYS_RESOURCE",
+                            "mknod",
+                            "SYS_PTRACE"
+                        ],
+                        "security_opt":[
+                            "label=disable",
+                            "unmask=ALL"
+                        ],
                         "build": {
                             "context": "./vm",
                             "args": {
                                 "TOKEN": team['token'],
-                                "TEAM_NAME": team['name'],
                             }
                         },
-                        **({"privileged": "true"} if args.privileged else { "runtime": "sysbox-runc" }),
+                        **({"privileged": "true"} if args.privileged else {}),
                         "restart": "unless-stopped",
-                        "volumes": [
-                            f"./volumes/team{team['id']}-root/:/root/"
+                        "devices": [
+                            "/dev/fuse:/dev/fuse"
                         ],
+                        "volumes": [
+                            f"./volumes/team{team['id']}-root/:/root/:z",
+                        ],
+                        **({ "storage_opt": {
+                            "size": data['max_disk_size']
+                        } }if args.disk_limit else {}),
                         "networks": {
                             f"vm-team{team['id']}": {
                                 "ipv4_address": f"10.60.{team['id']}.1"
@@ -323,14 +351,15 @@ def write_compose(data):
                         "build": "./wireguard",
                         "restart": "unless-stopped",
                         "cap_add": [
-                            "NET_ADMIN"
+                            "NET_ADMIN",
+                            "SYS_MODULE"
                         ],
                         "sysctls": [
+                            "net.ipv4.ip_forward=1",
                             "net.ipv4.conf.all.src_valid_mark=1",
-                            "net.ipv4.ip_forward=1"
                         ],
                         "volumes": [
-                            f"./wireguard/conf{team['id']}/:/config/"
+                            f"./wireguard/conf{team['id']}/:/config/:z"
                         ],
                         "networks": {
                             f"players{team['id']}": {
@@ -356,14 +385,10 @@ def write_compose(data):
             },
             "volumes": {
                 "unixsk": "",
+                "oasis-postgres-db": ""
             },
             "networks": {
-                "externalnet": {
-                    "driver": "bridge",
-                    "driver_opts": {
-                        "com.docker.network.bridge.enable_icc": '"false"'
-                    },
-                },
+                "externalnet": "",
                 "internalnet": "",
                 "gameserver": {
                     "internal": "true",
@@ -435,7 +460,7 @@ def clear_data(
             if folder.startswith("team"):
                 shutil.rmtree(f"./volumes/{folder}", ignore_errors=True)
     elif remove_gameserver_data:
-        shutil.rmtree("./volumes/database", ignore_errors=True)
+        remove_database_volume()
     if remove_wireguard:
         for file in os.listdir("./wireguard"):
             if file.startswith("conf"):
@@ -508,8 +533,6 @@ def config_input():
     data = {}
     if args.privileged:
         puts("Privileged mode enabled (DO NOT USE THIS IN PRODUCTION)", color=colors.yellow)
-    else:
-        puts("To run this project you need to install sysbox! https://github.com/nestybox/sysbox if your VM will be given to trusted people and can't install sysbox, use --privileged", color=colors.yellow)
     while True:
         number_of_teams = int(input('Number of teams: '))
         if number_of_teams < 1:
@@ -540,6 +563,7 @@ def config_input():
     data['submission_timeout'] = args.submission_timeout
     data['enable_nop_team'] = input('Enable NOP team? (Y/n): ').lower() != 'n'
     data['server_addr'] = input('Server address: ')
+    data['max_disk_size'] = args.max_disk_size
     
     while True:
         try:
@@ -566,7 +590,7 @@ def read_config():
 def write_gameserver_config(data):
     nop_team = data['teams'][0]['id'] if data['enable_nop_team'] else None
     gameserver_config = {
-        "log_level": data['gameserver_log_level'] if not args.debug else "debug",
+        "log_level": data['gameserver_log_level'],
         "round_len": data['tick_time']*1000,
         "token": data['gameserver_token'],
         "nop": f"10.60.{nop_team}.1" if not nop_team is None else "null",
@@ -585,23 +609,22 @@ def write_gameserver_config(data):
         "max_flags_per_request": data['max_flags_per_request'],
         "start_time": data['start_time'] if data['start_time'] else "null",
         "end_time": data['end_time'] if data['end_time'] else "null",
-        "debug": "true" if args.debug else "false",
+        "debug": "false",
     }
 
     with open(g.gammeserver_config_file, 'w') as f:
         f.write(dict_to_yaml(gameserver_config))
 
 
-def main():    
-    if not check_if_exists("docker"):
-        puts("Docker not found! please install docker and docker compose!", color=colors.red)
+def main():
+    if not check_if_exists("podman --version"):
+        puts("Podman not found! please install podman!", color=colors.red)
+    if not check_if_exists("podman ps"):
+        puts("Podman is not running, please install podman and podman compose!", color=colors.red)
         exit()
-    elif not check_if_exists("docker-compose") and not check_if_exists("docker compose"):
-        puts("Docker compose not found! please install docker compose!", color=colors.red)
+    elif not check_if_exists("podman-compose --version") and not check_if_exists("podman compose --version"):
+        puts("Podman compose not found! please install podman compose!", color=colors.red)
         exit()
-    if not check_if_exists("docker ps"):
-        puts("Cannot use docker, the user hasn't the permission or docker isn't running", color=colors.red)
-        exit()    
     
     if args.command:
         match args.command:
@@ -617,12 +640,12 @@ def main():
                     if args.config_only:
                         puts(f"Config file generated!, you can customize editing {g.config_file}", color=colors.green)
                         return
-                    if args.reset or args.rebuild_vm:
+                    if args.reset or args.rebuild:
                         puts("Clearing old setup images and volumes", color=colors.yellow)
                         clear_data(remove_config=False)
                     write_gameserver_config(config)
                     if not prebuilt_exists():
-                        if not (args.reset or args.rebuild_vm):
+                        if not (args.reset or args.rebuild):
                             puts("Prebuilt image not found!", color=colors.yellow)
                             puts("Clearing old setup images...", color=colors.yellow)
                             #If these images exists, we need to remove them to avoid errors
@@ -651,7 +674,7 @@ def main():
                     else:
                         puts(f"{g.name} is starting!", color=colors.yellow)
                         write_compose(read_config())
-                        puts("Running 'docker compose up -d --build'\n", color=colors.green)
+                        puts("Running 'podman compose up -d --build'\n", color=colors.green)
                         composecmd("up -d --build", g.composefile)
             case "compose":
                 if not config_exists():
@@ -659,14 +682,14 @@ def main():
                 else:
                     write_compose(read_config())
                     compose_cmd = " ".join(args.compose_args)
-                    puts(f"Running 'docker compose {compose_cmd}'\n", color=colors.green)
+                    puts(f"Running 'podman compose {compose_cmd}'\n", color=colors.green)
                     composecmd(compose_cmd, g.composefile)
             case "restart":
                 if not config_exists():
                     puts(f"Config file not found! please run {sys.argv[0]} start", color=colors.red)
                 elif check_already_running():
                     write_compose(read_config())
-                    puts("Running 'docker compose restart'\n", color=colors.green)
+                    puts("Running 'podman compose restart'\n", color=colors.green)
                     composecmd("restart", g.composefile)
                 else:
                     puts(f"{g.name} is not running!" , color=colors.red, is_bold=True, flush=True)
@@ -675,7 +698,7 @@ def main():
                     puts(f"Config file not found! please run {sys.argv[0]} start", color=colors.red)
                 elif check_already_running():
                     write_compose(read_config())
-                    puts("Running 'docker compose down'\n", color=colors.green)
+                    puts("Running 'podman compose down'\n", color=colors.green)
                     composecmd("down", g.composefile)
                 else:
                     puts(f"{g.name} is not running!" , color=colors.red, is_bold=True, flush=True)
