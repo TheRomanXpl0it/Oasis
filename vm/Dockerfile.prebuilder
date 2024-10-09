@@ -20,18 +20,18 @@ RUN dnf -y makecache && \
     iproute vim nano tcpdump iputils curl iptables podman podman-compose \
     python3-pip python3-virtualenv screen nc btop htop neovim iptables-nft \
     nano curl git wget unzip zip traceroute net-tools fuse-overlayfs \
-    openssh-server openssl ucpp --exclude container-selinux &&\
+    openssh-server openssl ucpp python3-pyyaml python3-dotenv --exclude container-selinux &&\
     ln -s /usr/bin/ucpp /usr/local/bin/cpp && dnf clean all
 
-RUN useradd podman && \
-    echo -e "podman:1:999\npodman:1001:64535" > /etc/subuid && \
-    echo -e "podman:1:999\npodman:1001:64535" > /etc/subgid
+RUN useradd oasis -G wheel,root && \
+    echo -e "oasis:1:999\noasis:1001:64535" > /etc/subuid && \
+    echo -e "oasis:1:999\noasis:1001:64535" > /etc/subgid
 
 ADD /containers.conf /etc/containers/containers.conf
-ADD /podman-containers.conf /home/podman/.config/containers/containers.conf
+ADD /podman-containers.conf /home/oasis/.config/containers/containers.conf
 
-RUN mkdir -p /home/podman/.local/share/containers && \
-    chown podman:podman -R /home/podman && \
+RUN mkdir -p /home/oasis/.local/share/containers && \
+    chown oasis:oasis -R /home/oasis && \
     chmod 644 /etc/containers/containers.conf
 
 # Copy & modify the defaults to provide reference if runtime changes needed.
@@ -44,6 +44,8 @@ RUN sed -e 's|^#mount_program|mount_program|g' \
 
 # Setup internal Podman to pass subscriptions down from host to internal container
 RUN printf '/run/secrets/etc-pki-entitlement:/run/secrets/etc-pki-entitlement\n/run/secrets/rhsm:/run/secrets/rhsm\n' > /etc/containers/mounts.conf
+RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
 
 RUN mkdir -p /var/lib/shared/overlay-images \
              /var/lib/shared/overlay-layers \
@@ -65,14 +67,18 @@ RUN ln -s /usr/bin/podman /usr/bin/docker && \
 
 # SSH
 RUN mkdir /var/run/sshd
-RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
 
 # Services
-WORKDIR /root/
-COPY ./services/ /services/
+COPY ./services/ /root/
 COPY ./entry.sh /sbin/init
-RUN chmod +x /sbin/init
+RUN chmod +x /sbin/init && chmod g+rw -R /root/
 
 RUN mkdir -p /run /run/lock /tmp /var/lib/journal
 
-ENTRYPOINT [ "/sbin/init", "prebuild" ]
+# Run podman as oasis user
+RUN mv /usr/bin/podman /usr/bin/_podman &&\
+    printf '#!/usr/bin/env bash\nexec sudo -u oasis -- /usr/bin/_podman "$@"\n' > /usr/bin/podman &&\
+    chmod +x /usr/bin/podman
+
+CMD [ "/sbin/init", "prebuild" ]
+

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 import argparse, sys, os, subprocess
-import json, secrets, shutil, time
+import json, secrets, shutil
 from datetime import datetime
 
 pref = "\033["
@@ -18,6 +18,8 @@ class g:
     prebuild_image = "oasis-prebuilder"
     prebuilded_container = "oasis-prebuilded"
     prebuilt_image = "oasis-vm-base"
+
+use_build_on_compose = True
 
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
@@ -113,13 +115,13 @@ def remove_prebuilded():
     return check_if_exists(f'podman container rm {g.prebuilded_container}')
 
 def remove_database_volume():
-    return check_if_exists(f'podman volume rm oasis_oasis-postgres-db')
+    return check_if_exists(f'podman volume rm -f oasis_oasis-postgres-db')
 
 def build_prebuilder():
     return check_if_exists(f'podman build -t {g.prebuild_image} -f ./vm/Dockerfile.prebuilder ./vm/', print_output=True)
 
 def build_prebuilt():
-    return check_if_exists(f'podman run -it --device /dev/fuse --security-opt label=disable --security-opt unmask=ALL --name {g.prebuilded_container} {g.prebuild_image}', print_output=True)
+    return check_if_exists(f'podman run -it --device /dev/fuse --cap-add audit_write,net_admin --security-opt label=disable --name {g.prebuilded_container} {g.prebuild_image}', print_output=True)
 
 def kill_builder():
     return check_if_exists(f'podman kill {g.prebuilded_container}', no_stderr=True)
@@ -164,7 +166,7 @@ def gen_args(args_to_parse: list[str]|None = None):
     parser_start.add_argument('--expose-gameserver', '-E', action='store_true', help='Expose gameserver port')
     parser_start.add_argument('--gameserver-port', default="127.0.0.1:8888", help='Gameserver port')
     parser_start.add_argument('--config-only', '-C', action='store_true', help='Only generate config file')
-    parser_start.add_argument('--disk-limit', '-D', action='store_true', help='Limit disk size for VMs')
+    parser_start.add_argument('--disk-limit', '-D', action='store_true', help='Limit disk size for VMs (NOT IMPLEMENTED YET)')
 
 
     #Stop Command
@@ -300,17 +302,11 @@ def write_compose(data):
                         "hostname": f"team{team['id']}",
                         "dns": [data['dns']],
                         "cap_add": [
-                            "SYS_ADMIN",
-                            "SYS_MODULE",
-                            "NET_ADMIN",
-                            "NET_RAW",
-                            "SYS_RESOURCE",
-                            "mknod",
-                            "SYS_PTRACE"
+                            "CAP_AUDIT_WRITE",
+                            "NET_ADMIN"
                         ],
                         "security_opt":[
                             "label=disable",
-                            "unmask=ALL"
                         ],
                         "build": {
                             "context": "./vm",
@@ -318,17 +314,20 @@ def write_compose(data):
                                 "TOKEN": team['token'],
                             }
                         },
+                        **({ "storage_opt": ["size="+data['max_disk_size']] } if args.disk_limit else {}),
+                        "sysctls": [
+                            "net.ipv4.ip_unprivileged_port_start=1" #Allow non-privilaged podman to bind all ports
+                        ],
                         **({"privileged": "true"} if args.privileged else {}),
                         "restart": "unless-stopped",
                         "devices": [
-                            "/dev/fuse:/dev/fuse"
+                            "/dev/fuse",
+                            "/dev/net/tun"
                         ],
+                        #Allow to edit net.* sysctls (kernel will show only sys option in the network namespace of the container)
                         "volumes": [
-                            f"./volumes/team{team['id']}-root/:/root/:z",
+                            "/proc/sys/net:/proc/sys/net",
                         ],
-                        **({ "storage_opt": {
-                            "size": data['max_disk_size']
-                        } }if args.disk_limit else {}),
                         "networks": {
                             f"vm-team{team['id']}": {
                                 "ipv4_address": f"10.60.{team['id']}.1"
@@ -449,17 +448,9 @@ def clear_data(
     remove_wireguard=True,
     remove_checkers_data=True,
     remove_gameserver_config=True,
-    remove_gameserver_data=True,
-    remove_vm_data=True,
-    
+    remove_gameserver_data=True  
 ):
-    if remove_vm_data and remove_gameserver_data:
-        shutil.rmtree("./volumes", ignore_errors=True)
-    elif remove_vm_data:
-        for folder in os.listdir("./volumes"):
-            if folder.startswith("team"):
-                shutil.rmtree(f"./volumes/{folder}", ignore_errors=True)
-    elif remove_gameserver_data:
+    if remove_gameserver_data:
         remove_database_volume()
     if remove_wireguard:
         for file in os.listdir("./wireguard"):
@@ -630,52 +621,53 @@ def main():
         match args.command:
             case "start":
                 if check_already_running():
-                    puts(f"{g.name} is already running! use --help to see options useful to manage {g.name} execution", color=colors.yellow)
+                    puts(f"{g.name} is already running!", color=colors.yellow)
+                if args.reset or not config_exists() or args.config_only:
+                    config = config_input()
+                    create_config(config)
                 else:
-                    if args.reset or not config_exists() or args.config_only:
-                        config = config_input()
-                        create_config(config)
-                    else:
-                        config = read_config()
-                    if args.config_only:
-                        puts(f"Config file generated!, you can customize editing {g.config_file}", color=colors.green)
-                        return
-                    if args.reset or args.rebuild:
-                        puts("Clearing old setup images and volumes", color=colors.yellow)
-                        clear_data(remove_config=False)
-                    write_gameserver_config(config)
-                    if not prebuilt_exists():
-                        if not (args.reset or args.rebuild):
-                            puts("Prebuilt image not found!", color=colors.yellow)
-                            puts("Clearing old setup images...", color=colors.yellow)
-                            #If these images exists, we need to remove them to avoid errors
-                            remove_prebuilder()
-                            remove_prebuilded()
-                            remove_prebuilt()
-                        puts("Building the prebuilder image", color=colors.yellow)
-                        if not build_prebuilder():
-                            puts("Error building prebuilder image", color=colors.red)
-                            exit(1)
-                        puts("Executing prebuilder to creating VMs base image", color=colors.yellow)
-                        if not build_prebuilt():
-                            puts("Error building prebuilt image", color=colors.red)
-                            exit(1)
-                        puts("Creating base VM image (this action takes time and gives no output)", color=colors.yellow)
-                        if not commit_prebuilt():
-                            puts("Error commiting prebuilt image", color=colors.red)
-                            exit(1)
-                        puts("Clear unused images", color=colors.yellow)
+                    config = read_config()
+                if args.config_only:
+                    puts(f"Config file generated!, you can customize editing {g.config_file}", color=colors.green)
+                    return
+                if args.reset:
+                    puts("Clearing old setup images and volumes", color=colors.yellow)
+                    clear_data(remove_config=False)
+                elif args.rebuild:
+                    clear_data(remove_config=False, remove_checkers_data=False, remove_gameserver_data=False, remove_wireguard=False)
+                write_gameserver_config(config)
+                if not prebuilt_exists():
+                    if not (args.reset or args.rebuild):
+                        puts("Prebuilt image not found!", color=colors.yellow)
+                        puts("Clearing old setup images...", color=colors.yellow)
+                        #If these images exists, we need to remove them to avoid errors
                         remove_prebuilder()
                         remove_prebuilded()
-                    
-                    if not config_exists():
-                        puts(f"Config file not found! please run {sys.argv[0]} start", color=colors.red)
-                    
-                    else:
-                        puts(f"{g.name} is starting!", color=colors.yellow)
-                        write_compose(read_config())
-                        puts("Running 'podman compose up -d --build'\n", color=colors.green)
-                        composecmd("up -d --build", g.composefile)
+                        remove_prebuilt()
+                    puts("Building the prebuilder image", color=colors.yellow)
+                    if not build_prebuilder():
+                        puts("Error building prebuilder image", color=colors.red)
+                        exit(1)
+                    puts("Executing prebuilder to creating VMs base image", color=colors.yellow)
+                    if not build_prebuilt():
+                        puts("Error building prebuilt image", color=colors.red)
+                        exit(1)
+                    puts("Creating base VM image (this action takes time and gives no output)", color=colors.yellow)
+                    if not commit_prebuilt():
+                        puts("Error commiting prebuilt image", color=colors.red)
+                        exit(1)
+                    puts("Clear unused images", color=colors.yellow)
+                    remove_prebuilder()
+                    remove_prebuilded()
+                
+                if not config_exists():
+                    puts(f"Config file not found! please run {sys.argv[0]} start", color=colors.red)
+                
+                else:
+                    puts(f"{g.name} is starting!", color=colors.yellow)
+                    write_compose(read_config())
+                    puts(f"Running 'podman compose up -d{' --build' if use_build_on_compose else ''}'\n", color=colors.green)
+                    composecmd(f"up -d{' --build' if use_build_on_compose else ''} --remove-orphans", g.composefile)
             case "compose":
                 if not config_exists():
                     puts(f"Config file not found! please run {sys.argv[0]} start", color=colors.red)
@@ -699,7 +691,7 @@ def main():
                 elif check_already_running():
                     write_compose(read_config())
                     puts("Running 'podman compose down'\n", color=colors.green)
-                    composecmd("down", g.composefile)
+                    composecmd("down --remove-orphans", g.composefile)
                 else:
                     puts(f"{g.name} is not running!" , color=colors.red, is_bold=True, flush=True)
     
