@@ -71,14 +71,14 @@ RUN mkdir /var/run/sshd
 # Services
 COPY ./services/ /root/
 COPY ./entry.sh /sbin/init
-RUN chmod +x /sbin/init && chmod g+rw -R /root/
+RUN chmod +x /sbin/init
 
 RUN mkdir -p /run /run/lock /tmp /var/lib/journal
 
 # Run podman as oasis user
 RUN mv /usr/bin/podman /usr/bin/_podman &&\
     printf '#!/usr/bin/env bash\nexec sudo -u oasis -- /usr/bin/_podman "$@"\n' > /usr/bin/podman &&\
-    chmod +x /usr/bin/podman
+    chmod +x /usr/bin/podman && chmod g+rw -R /root/
 
 CMD [ "/sbin/init", "prebuild" ]
 
