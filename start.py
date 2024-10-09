@@ -166,7 +166,7 @@ def gen_args(args_to_parse: list[str]|None = None):
     parser_start.add_argument('--expose-gameserver', '-E', action='store_true', help='Expose gameserver port')
     parser_start.add_argument('--gameserver-port', default="127.0.0.1:8888", help='Gameserver port')
     parser_start.add_argument('--config-only', '-C', action='store_true', help='Only generate config file')
-    parser_start.add_argument('--disk-limit', '-D', action='store_true', help='Limit disk size for VMs (NOT IMPLEMENTED YET)')
+    parser_start.add_argument('--disk-limit', '-D', action='store_true', help='Limit disk size for VMs (NEED TO ENABLE QUOTAS)')
 
 
     #Stop Command
@@ -179,6 +179,8 @@ def gen_args(args_to_parse: list[str]|None = None):
     parser_restart.add_argument('--disk-limit', '-D', action='store_true', help='Limit disk size for VMs')
     parser_restart.add_argument('--expose-gameserver', '-E', action='store_true', help='Expose gameserver port')
     parser_restart.add_argument('--gameserver-port', default="127.0.0.1:8888", help='Gameserver port')
+    
+    subcommands.add_parser('enable-quotas', help=f'Enable quotas for VMs (Need XFS and this file has to be running directly in the host) (Need to be run only once)')
     
     args = parser.parse_args(args=args_to_parse)
     
@@ -196,10 +198,64 @@ def gen_args(args_to_parse: list[str]|None = None):
     
     if not "disk_limit" in args:
         args.disk_limit = False
+    
+    if not check_for_quotas() and args.disk_limit:
+        if not ask_for_quota_command():
+            exit(1)
         
     args.clear = args.bef_clear or args.clear
 
     return args
+
+def ask_for_quota_command():
+    print("This command will set some settings for podman to enable quotas")
+    print("- Run this only once")
+    print("- Run me directly in the host that runs the containers")
+    print("- Run me with root privilages")
+    puts("If one of these conditions are not met, please cancel this command", color=colors.red)
+    if input('You are running the command correctly? (y/N): ').lower() == 'y':
+        enable_quotas()
+        puts("Quotas enabled!", color=colors.green)
+        return True
+    else:
+        puts("Operation cancelled", color=colors.red)
+        return False
+
+
+quota_setting_xfs = [
+    ("100000:/var/lib/containers/storage/overlay", "/etc/projects"),
+    ("200000:/var/lib/containers/storage/volumes", "/etc/projects"),
+    ("storage:100000", "/etc/projid"),
+    ("volumes:200000", "/etc/projid"),
+]
+
+def check_for_quotas():
+    for data_to_write, filename in quota_setting_xfs:
+        try:
+            with open(filename, 'r') as f:
+                data = f.read()
+            if not data_to_write in data:
+                return False
+        except FileNotFoundError:
+            return False
+    return True
+
+def enable_quotas():
+    for data_to_write, filename in quota_setting_xfs:
+        try:
+            with open(filename, 'r') as f:
+                data = f.read()
+        except FileNotFoundError:
+            data = ""
+        if not data_to_write in data:
+            with open(filename, 'a') as f:
+                f.write(data_to_write+'\n')
+
+    if not check_if_exists("xfs_quota -x -c 'project -s storage volumes' /", print_output=True):
+        puts("Failed to setup xfs quotas", color=colors.red)
+        exit(1)
+
+
 
 args = gen_args()
 
@@ -605,7 +661,7 @@ def write_gameserver_config(data):
 
     with open(g.gammeserver_config_file, 'w') as f:
         f.write(dict_to_yaml(gameserver_config))
-
+    
 
 def main():
     if not check_if_exists("podman --version"):
@@ -619,6 +675,9 @@ def main():
     
     if args.command:
         match args.command:
+            case "enable-quotas":
+                ask_for_quota_command()
+                return
             case "start":
                 if check_already_running():
                     puts(f"{g.name} is already running!", color=colors.yellow)
