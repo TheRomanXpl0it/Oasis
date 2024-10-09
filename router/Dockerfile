@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM alpine
 
 RUN apk update && apk add iptables iproute2 bash ethtool tcpdump traceroute netcat-openbsd socat
 

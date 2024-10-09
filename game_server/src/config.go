@@ -23,6 +23,7 @@ type Config struct {
 	SubmitterLimitTime  time.Duration
 	GameStartTime       time.Time
 	GameEndTime         *time.Time
+	FlagRegex           string
 	Services            []string
 	LogLevel            string              `yaml:"log_level"`
 	Round               int64               `yaml:"round_len"`
@@ -86,6 +87,8 @@ func LoadConfig(path string) (*Config, error) {
 		return c, err
 	}
 	conf = c
+
+	conf.FlagRegex = "[A-Z0-9]{31}="
 
 	conf.RoundLen = time.Duration(conf.Round) * time.Millisecond
 	if conf.SubmitterLimit != nil {

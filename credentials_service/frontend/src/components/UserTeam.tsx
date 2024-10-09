@@ -24,7 +24,7 @@ export const UserTeams = () => {
             message: '',
             error: false,
         });
-        downloadConfig().then(() => {
+        downloadConfig(`team${team?.id}-${team?.profile}.conf`).then(() => {
             setMessage({
                 message:'Configuration downloaded',
                 error: false,

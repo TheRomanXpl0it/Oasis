@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM oven/bun AS frontend 
+FROM --platform=$BUILDPLATFORM docker.io/oven/bun AS frontend 
 WORKDIR /app
 ADD ./frontend/package.json .
 ADD ./frontend/bun.lockb .

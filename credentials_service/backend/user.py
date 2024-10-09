@@ -65,5 +65,5 @@ def download_config():
     
     return send_file(profile_path,
         as_attachment=True,
-        download_name=f"vpn-team{team_id}-profile{user_id}.conf",
+        download_name=f"team{team_id}-{user_id}.conf",
     )
