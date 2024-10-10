@@ -47,7 +47,7 @@ defense_points[flag] = min(victim_score, offense_points)`}
         <Text mt="md">According to the previous pseudocode, the attacking team will be assigned offense_points points and the victime team will loose defense_points points:</Text>
         <Code block mt="md">
 {`# Service base points 
-score[team][service] = 5000 
+score[team][service] = ${config.data.init_service_points} 
           
 # Sum offensive points 
 for flag in stolen_flags[team][service]:

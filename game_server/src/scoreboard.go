@@ -259,6 +259,7 @@ type ConfigAPIResponse struct {
 	SubmitterRateLimit  uint         `json:"submitter_rate_limit"`
 	CurrentRound        int          `json:"current_round"`
 	FlagRegex           string       `json:"flag_regex"`
+	InitServicePoints   float64      `json:"init_service_points"`
 }
 
 func extractTeamID(ip string) uint {
@@ -299,6 +300,7 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 		SubmitterRateLimit:  uint(*conf.SubmitterLimit),
 		CurrentRound:        db.GetExposedRound(),
 		FlagRegex:           conf.FlagRegex,
+		InitServicePoints:   conf.InitialServiceScore,
 	}); err != nil {
 		log.Errorf("Error encoding response: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)

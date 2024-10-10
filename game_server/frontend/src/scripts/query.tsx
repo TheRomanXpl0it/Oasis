@@ -15,6 +15,7 @@ type Config = {
     submitter_rate_limit: number
     current_round: number,
     flag_regex: string,
+    init_service_points: number,
 }
 
 export type TeamServiceScore = {

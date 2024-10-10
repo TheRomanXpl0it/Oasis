@@ -67,7 +67,7 @@ def puts(text, *args, color=colors.white, is_bold=False, **kwargs):
 
 def sep(): puts("-----------------------------------", is_bold=True)
 
-def check_if_exists(program, get_output=False, print_output=False, no_stderr=False):
+def cmd_check(program, get_output=False, print_output=False, no_stderr=False):
     if get_output:
         return subprocess.getoutput(program)
     if print_output:
@@ -77,57 +77,57 @@ def check_if_exists(program, get_output=False, print_output=False, no_stderr=Fal
 def composecmd(cmd, composefile=None):
     if composefile:
         cmd = f"-f {composefile} {cmd}"
-    if not check_if_exists("podman --version"):
+    if not cmd_check("podman --version"):
         return puts("Podman not found! please install podman!", color=colors.red)
-    elif not check_if_exists("podman ps"):
+    elif not cmd_check("podman ps"):
         return puts("Cannot use podman, the user hasn't the permission or podman isn't running", color=colors.red)
-    elif check_if_exists("podman compose --version"):
+    elif cmd_check("podman compose --version"):
         return os.system(f"podman compose -p {g.compose_project_name} {cmd}")
-    elif check_if_exists("podman-compose --version"):
+    elif cmd_check("podman-compose --version"):
         return os.system(f"podman-compose -p {g.compose_project_name} {cmd}")
     else:
         return puts("Podman compose not found! please install podman compose!", color=colors.red)
 
 def dockercmd(cmd):
-    if check_if_exists("podman --version"):
+    if cmd_check("podman --version"):
         return os.system(f"podman {cmd}")
-    elif not check_if_exists("podman ps"):
+    elif not cmd_check("podman ps"):
         puts("Cannot use podman, the user hasn't the permission or podman isn't running", color=colors.red)
     else:
         puts("Podman not found! please install podman!", color=colors.red)
 
 def check_already_running():
-    return g.container_name in check_if_exists(f'podman ps --filter "name=^{g.container_name}$"', get_output=True)
+    return g.container_name in cmd_check(f'podman ps --filter "name=^{g.container_name}$"', get_output=True)
 
 def prebuilder_exists():
-    return g.prebuild_image in check_if_exists(f'podman image ls --filter "reference={g.prebuild_image}"', get_output=True)
+    return g.prebuild_image in cmd_check(f'podman image ls --filter "reference={g.prebuild_image}"', get_output=True)
 
 def prebuilt_exists():
-    return g.prebuilt_image in check_if_exists(f'podman image ls --filter "reference={g.prebuilt_image}"', get_output=True)
+    return g.prebuilt_image in cmd_check(f'podman image ls --filter "reference={g.prebuilt_image}"', get_output=True)
 
 def remove_prebuilder():
-    return check_if_exists(f'podman image rm {g.prebuild_image}')
+    return cmd_check(f'podman image rm {g.prebuild_image}')
 
 def remove_prebuilt():
-    return check_if_exists(f'podman image rm {g.prebuilt_image}')
+    return cmd_check(f'podman image rm {g.prebuilt_image}')
 
 def remove_prebuilded():
-    return check_if_exists(f'podman container rm {g.prebuilded_container}')
+    return cmd_check(f'podman container rm {g.prebuilded_container}')
 
 def remove_database_volume():
-    return check_if_exists(f'podman volume rm -f oasis_oasis-postgres-db')
+    return cmd_check(f'podman volume rm -f oasis_oasis-postgres-db')
 
 def build_prebuilder():
-    return check_if_exists(f'podman build -t {g.prebuild_image} -f ./vm/Dockerfile.prebuilder ./vm/', print_output=True)
+    return cmd_check(f'podman build -t {g.prebuild_image} -f ./vm/Dockerfile.prebuilder ./vm/', print_output=True)
 
 def build_prebuilt():
-    return check_if_exists(f'podman run -it --device /dev/fuse --cap-add audit_write,net_admin --security-opt label=disable --name {g.prebuilded_container} {g.prebuild_image}', print_output=True)
+    return cmd_check(f'podman run -it --device /dev/fuse --cap-add audit_write,net_admin --security-opt label=disable --name {g.prebuilded_container} {g.prebuild_image}', print_output=True)
 
 def kill_builder():
-    return check_if_exists(f'podman kill {g.prebuilded_container}', no_stderr=True)
+    return cmd_check(f'podman kill {g.prebuilded_container}', no_stderr=True)
 
 def commit_prebuilt():
-    return check_if_exists(f'podman commit {g.prebuilded_container} {g.prebuilt_image}', print_output=True)
+    return cmd_check(f'podman commit {g.prebuilded_container} {g.prebuilt_image}', print_output=True)
 
 def gen_args(args_to_parse: list[str]|None = None):                     
     
@@ -251,7 +251,7 @@ def enable_quotas():
             with open(filename, 'a') as f:
                 f.write(data_to_write+'\n')
 
-    if not check_if_exists("xfs_quota -x -c 'project -s storage volumes' /", print_output=True):
+    if not cmd_check("xfs_quota -x -c 'project -s storage volumes' /", print_output=True):
         puts("Failed to setup xfs quotas", color=colors.red)
         exit(1)
 
@@ -664,12 +664,12 @@ def write_gameserver_config(data):
     
 
 def main():
-    if not check_if_exists("podman --version"):
+    if not cmd_check("podman --version"):
         puts("Podman not found! please install podman!", color=colors.red)
-    if not check_if_exists("podman ps"):
+    if not cmd_check("podman ps"):
         puts("Podman is not running, please install podman and podman compose!", color=colors.red)
         exit()
-    elif not check_if_exists("podman-compose --version") and not check_if_exists("podman compose --version"):
+    elif not cmd_check("podman-compose --version") and not cmd_check("podman compose --version"):
         puts("Podman compose not found! please install podman compose!", color=colors.red)
         exit()
     
