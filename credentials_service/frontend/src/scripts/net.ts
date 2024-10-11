@@ -29,7 +29,7 @@ export type LoginInfo = {
 }
 
 const getUrl = (path: string) => {
-    const prefix = import.meta.env.DEV ? "http://localhost:1234/api" : "/api"
+    const prefix = import.meta.env.DEV ? "http://localhost:4040/api" : "/api"
     return prefix + path
 }
 
@@ -146,7 +146,7 @@ export const userLogin = async (pin: string) => {
     }
 }
 
-export const downloadConfig = async () => {
+export const downloadConfig = async (fn: string = "profile.conf") => {
     const response = await fetch(getUrl('/user/download_config/'), {
         headers: { 'Authorization': `Bearer ${getToken()}` },
     });
@@ -154,8 +154,9 @@ export const downloadConfig = async () => {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
+        response
         a.href = url;
-        a.download = 'oasis-vpn-profile.conf';
+        a.download = fn;
         a.click();
         return true;
     } else {

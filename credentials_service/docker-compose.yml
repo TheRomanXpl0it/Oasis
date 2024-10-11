@@ -3,7 +3,7 @@ services:
     build: ./
     restart: unless-stopped
     volumes:
-      - ../oasis-setup-config.json:/app/oasis-setup-config.json
-      - ../wireguard:/app/wireguard
+      - ../oasis-setup-config.json:/app/oasis-setup-config.json:z
+      - ../wireguard:/app/wireguard:z
     ports:
-      - "4040:4040"
+      - "127.0.0.1:4040:4040"

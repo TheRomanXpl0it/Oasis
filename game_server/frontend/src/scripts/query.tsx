@@ -13,7 +13,9 @@ type Config = {
     flag_expire_ticks: number,
     submitter_flags_limit: number,
     submitter_rate_limit: number
-    current_round: number
+    current_round: number,
+    flag_regex: string,
+    init_service_points: number,
 }
 
 export type TeamServiceScore = {

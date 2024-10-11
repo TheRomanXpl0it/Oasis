@@ -1,8 +1,0 @@
-[Unit]
-Description=VM init service
-
-[Service]
-ExecStart=/usr/bin/_entry_vm_init prebuild
-
-[Install]
-WantedBy=multi-user.target

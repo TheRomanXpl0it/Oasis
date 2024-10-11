@@ -47,7 +47,7 @@ defense_points[flag] = min(victim_score, offense_points)`}
         <Text mt="md">According to the previous pseudocode, the attacking team will be assigned offense_points points and the victime team will loose defense_points points:</Text>
         <Code block mt="md">
 {`# Service base points 
-score[team][service] = 5000 
+score[team][service] = ${config.data.init_service_points} 
           
 # Sum offensive points 
 for flag in stolen_flags[team][service]:
@@ -86,7 +86,7 @@ for service in services:
         <Text mt="md">Please note that, regarding the SLA %, a service is considered up (ticks_up[team][service]) only when every check performed in a round is successful (OK).</Text>
         <Text mt="md">Since there are countless ways to break a service, the scoreboard may be not provide full information if a service is marked as corrupt or mumble. Try to restore the service from your backup (please backup it before applying any patch) and check if the service is marked as up in few minutes.</Text>
         <Title order={2} mt="lg">Flags</Title>
-        <Text mt="lg">A flag is a string made up of 31 uppercase alphabetic or numeric chars, followed by =. Each flag is matched by the regular expression <u>[A-Z0-9]{31}=</u>.</Text>
+        <Text mt="lg">A flag is a string made up of 31 uppercase alphabetic or numeric chars, followed by =. Each flag is matched by the regular expression <u>{config.data.flag_regex}</u>.</Text>
         <Text mt="md">You can submit stolen flags by performing an HTTP PUT request to the Game System at http://10.10.0.1:8080/flags. The flags must be submitted as an array of strings and the requests must contains the header X-Team-Token set to the team token given to the participants.</Text>
         <Text mt="md"><u>Note: the flag submission is rate limited to a maximum of 1 requests per {secondDurationToString(config.data.submitter_rate_limit/1000)} and each request will elaborate up to {config.data.submitter_flags_limit} flags, flags exceeding this limit will be ignored and must be submitted in another request.</u></Text>
         <Text mt="md">As an example, we provide a simple python snippet that accounts for the submission of two flag using.</Text>
