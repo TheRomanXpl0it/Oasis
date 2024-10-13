@@ -134,6 +134,7 @@ func runChecker(team string, service string, params *CheckerParams, ctx context.
 		color = log.HIGH_RED
 	case KILLED:
 		color = log.PURPLE
+		msg = "Checker timeout (killed, service is probably down)"
 	default:
 		log.Infof("Checker unknown status %v: %v%v%v from %v:%v on %v", params.Action, color, exitCode, log.END, team, params.TeamID, service)
 		return ERROR, msg
@@ -270,6 +271,8 @@ func checkerRoutine() {
 						GetFlagAt:      time.Now(),
 					}
 
+					dbctx := context.Background()
+
 					checkersWaitGroup.Add(len(validFlags) + 2)
 					for j := range len(validFlags) + 2 {
 						flag := newFlag
@@ -305,7 +308,7 @@ func checkerRoutine() {
 								statusData.PutFlagAt = time.Now()
 								if status != OK {
 									//Delete the flag if the put failed
-									if _, err := conn.NewDelete().Model(&db.Flag{}).Where("id = ?", flag).Exec(ctx); err != nil {
+									if _, err := conn.NewDelete().Model(&db.Flag{}).Where("id = ?", flag).Exec(dbctx); err != nil {
 										log.Criticalf("Error deleting flag %v:%v on %v: %v", team, teamId, service, err)
 									}
 								}
@@ -327,7 +330,6 @@ func checkerRoutine() {
 					checkersWaitGroup.Wait()
 					waitForRound(currentRound) // Wait for the end of the round before updating the database
 
-					dbctx := context.Background()
 					err := conn.RunInTx(dbctx, nil, func(dbctx context.Context, tx bun.Tx) error {
 						_, err := conn.NewInsert().Model(&statusData).Exec(dbctx)
 						if err != nil {

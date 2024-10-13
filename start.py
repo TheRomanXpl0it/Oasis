@@ -265,7 +265,10 @@ def write_compose(data):
                     ],
                     "sysctls": [
                         "net.ipv4.ip_forward=1",
-                        "net.ipv4.tcp_timestamps=0"
+                        "net.ipv4.tcp_timestamps=0",
+                        "net.ipv4.conf.all.rp_filter=1",
+                        "net.ipv6.conf.all.forwarding=0",
+                        "net.ipv6.conf.eth0.autoconf=0"
                     ],
                     "environment": {
                         "NTEAM": len(data['teams'])
