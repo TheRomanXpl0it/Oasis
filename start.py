@@ -88,14 +88,6 @@ def composecmd(cmd, composefile=None):
     else:
         return puts("Podman compose not found! please install podman compose!", color=colors.red)
 
-def dockercmd(cmd):
-    if cmd_check("podman --version"):
-        return os.system(f"podman {cmd}")
-    elif not cmd_check("podman ps"):
-        puts("Cannot use podman, the user hasn't the permission or podman isn't running", color=colors.red)
-    else:
-        puts("Podman not found! please install podman!", color=colors.red)
-
 def check_already_running():
     return g.container_name in cmd_check(f'podman ps --filter "name=^{g.container_name}$"', get_output=True)
 
@@ -359,7 +351,8 @@ def write_compose(data):
                         "dns": [data['dns']],
                         "cap_add": [
                             "CAP_AUDIT_WRITE",
-                            "NET_ADMIN"
+                            "NET_ADMIN",
+                            "NET_RAW",
                         ],
                         "security_opt":[
                             "label=disable",
