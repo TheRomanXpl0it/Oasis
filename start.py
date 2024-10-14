@@ -366,7 +366,7 @@ def write_compose(data):
                                 "TOKEN": team['token'],
                             }
                         },
-                        **({ "storage_opt": ["size="+data['max_disk_size']] } if args.disk_limit else {}),
+                        **({ "storage_opt": {"size":data['max_disk_size']} } if args.disk_limit else {}),
                         "sysctls": [
                             "net.ipv4.ip_unprivileged_port_start=1" #Allow non-privilaged podman to bind all ports
                         ],
