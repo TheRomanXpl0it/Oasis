@@ -7,6 +7,7 @@
 # podman ps is used to avoid podman compose crash on first run
 podman ps &> /dev/null
 
+
 if [[ "$1" == "prebuild" ]]; then
     # Only with this for loop we can exit internally from the loop
     for path in $(find /root/ -maxdepth 1 -mindepth 1 -type d); do
@@ -22,10 +23,12 @@ if [[ "$1" == "prebuild" ]]; then
             fi
         fi
     done
+    dnf install -y docker-compose
     echo "Prebuild execution done"
     exit 0
 fi
 if [[ "$1" == "entry" ]]; then
+    podman --log-level=info system service --time=0 &>> /home/oasis/podman.log &
     TEAM_ID=$(ip a | grep -oP '((?<=)10.60.+.1\/24(?=))' | cut -d'.' -f3)
     # Set up network
     ip link set eth0 name game
