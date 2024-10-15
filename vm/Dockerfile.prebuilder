@@ -7,7 +7,7 @@ RUN dnf -y makecache && \
     dnf -y update && \
     rpm --setcaps shadow-utils 2>/dev/null && \
     dnf install -y \
-    iproute vim nano tcpdump iputils curl iptables podman podman-compose runc \
+    iproute vim nano tcpdump iputils curl iptables podman docker-compose runc \
     python3-pip python3-virtualenv screen nc btop htop neovim iptables-nft \
     nano curl git wget unzip zip traceroute net-tools fuse-overlayfs rsync \
     openssh-server openssl ucpp python3-pyyaml python3-dotenv --exclude container-selinux &&\

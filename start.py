@@ -119,7 +119,7 @@ def kill_builder():
     return cmd_check(f'podman kill {g.prebuilded_container}', no_stderr=True)
 
 def commit_prebuilt():
-    return cmd_check(f'podman commit {g.prebuilded_container} {g.prebuilt_image}', print_output=True)
+    return cmd_check(f'podman commit {g.prebuilded_container} {g.prebuilt_image}:latest', print_output=True)
 
 def gen_args(args_to_parse: list[str]|None = None):                     
     
@@ -693,14 +693,13 @@ def main():
                     puts("Clearing old setup images and volumes", color=colors.yellow)
                     clear_data(remove_config=False)
                 elif args.rebuild:
-                    clear_data(remove_config=False, remove_checkers_data=False, remove_gameserver_data=False, remove_wireguard=False)
+                    clear_data(remove_config=False, remove_checkers_data=False, remove_gameserver_data=False, remove_wireguard=False, remove_prebuilder_image=False)
                 write_gameserver_config(config)
                 if not prebuilt_exists():
                     if not (args.reset or args.rebuild):
                         puts("Prebuilt image not found!", color=colors.yellow)
                         puts("Clearing old setup images...", color=colors.yellow)
                         #If these images exists, we need to remove them to avoid errors
-                        remove_prebuilder()
                         remove_prebuilded()
                         remove_prebuilt()
                     puts("Building the prebuilder image", color=colors.yellow)
@@ -716,7 +715,6 @@ def main():
                         puts("Error commiting prebuilt image", color=colors.red)
                         exit(1)
                     puts("Clear unused images", color=colors.yellow)
-                    remove_prebuilder()
                     remove_prebuilded()
                 
                 if not config_exists():

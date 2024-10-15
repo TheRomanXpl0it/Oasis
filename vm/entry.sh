@@ -9,6 +9,7 @@ podman ps &> /dev/null
 
 
 if [[ "$1" == "prebuild" ]]; then
+    podman --log-level=info system service --time=0 &>> /home/oasis/podman.log &
     # Only with this for loop we can exit internally from the loop
     for path in $(find /root/ -maxdepth 1 -mindepth 1 -type d); do
         if [[ -f "$path/compose.yml" || -f "$path/compose.yaml" || -f "$path/docker-compose.yml" || -f "$path/docker-compose.yaml" ]]; then
@@ -23,7 +24,6 @@ if [[ "$1" == "prebuild" ]]; then
             fi
         fi
     done
-    dnf install -y docker-compose
     echo "Prebuild execution done"
     exit 0
 fi
