@@ -1,25 +1,15 @@
 FROM registry.fedoraproject.org/fedora:latest
 
-# When building for multiple-architectures in parallel using emulation
-# it's really easy for one/more dnf processes to timeout or mis-count
-# the minimum download rates.  Bump both to be extremely forgiving of
-# an overworked host.
 RUN echo -e "\n\n# Added during image build" >> /etc/dnf/dnf.conf && \
     echo -e "minrate=100\ntimeout=60\n" >> /etc/dnf/dnf.conf
 
-# Don't include container-selinux and remove
-# directories used by dnf that are just taking
-# up space.
-# TODO: rpm --setcaps... needed due to Fedora (base) image builds
-#       being (maybe still?) affected by
-#       https://bugzilla.redhat.com/show_bug.cgi?id=1995337#c3
 RUN dnf -y makecache && \
     dnf -y update && \
     rpm --setcaps shadow-utils 2>/dev/null && \
     dnf install -y \
-    iproute vim nano tcpdump iputils curl iptables podman podman-compose \
+    iproute vim nano tcpdump iputils curl iptables podman docker-compose runc \
     python3-pip python3-virtualenv screen nc btop htop neovim iptables-nft \
-    nano curl git wget unzip zip traceroute net-tools fuse-overlayfs \
+    nano curl git wget unzip zip traceroute net-tools fuse-overlayfs rsync \
     openssh-server openssl ucpp python3-pyyaml python3-dotenv --exclude container-selinux &&\
     ln -s /usr/bin/ucpp /usr/local/bin/cpp && dnf clean all
 
@@ -34,15 +24,13 @@ RUN mkdir -p /home/oasis/.local/share/containers && \
     chown oasis:oasis -R /home/oasis && \
     chmod 644 /etc/containers/containers.conf
 
-# Copy & modify the defaults to provide reference if runtime changes needed.
-# Changes here are required for running with fuse-overlay storage inside container.
 RUN sed -e 's|^#mount_program|mount_program|g' \
            -e '/additionalimage.*/a "/var/lib/shared",' \
            -e 's|^mountopt[[:space:]]*=.*$|mountopt = "nodev,fsync=0"|g' \
            /usr/share/containers/storage.conf \
            > /etc/containers/storage.conf
 
-# Setup internal Podman to pass subscriptions down from host to internal container
+
 RUN printf '/run/secrets/etc-pki-entitlement:/run/secrets/etc-pki-entitlement\n/run/secrets/rhsm:/run/secrets/rhsm\n' > /etc/containers/mounts.conf
 RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
 RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd

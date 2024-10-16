@@ -88,14 +88,6 @@ def composecmd(cmd, composefile=None):
     else:
         return puts("Podman compose not found! please install podman compose!", color=colors.red)
 
-def dockercmd(cmd):
-    if cmd_check("podman --version"):
-        return os.system(f"podman {cmd}")
-    elif not cmd_check("podman ps"):
-        puts("Cannot use podman, the user hasn't the permission or podman isn't running", color=colors.red)
-    else:
-        puts("Podman not found! please install podman!", color=colors.red)
-
 def check_already_running():
     return g.container_name in cmd_check(f'podman ps --filter "name=^{g.container_name}$"', get_output=True)
 
@@ -127,7 +119,7 @@ def kill_builder():
     return cmd_check(f'podman kill {g.prebuilded_container}', no_stderr=True)
 
 def commit_prebuilt():
-    return cmd_check(f'podman commit {g.prebuilded_container} {g.prebuilt_image}', print_output=True)
+    return cmd_check(f'podman commit {g.prebuilded_container} {g.prebuilt_image}:latest', print_output=True)
 
 def gen_args(args_to_parse: list[str]|None = None):                     
     
@@ -161,6 +153,7 @@ def gen_args(args_to_parse: list[str]|None = None):
     parser_start.add_argument('--start-time', type=str, help='Start time (ISO 8601)')
     parser_start.add_argument('--end-time', type=str, help='End time (ISO 8601)')
     parser_start.add_argument('--max-disk-size', type=str, default="30G", help='Max disk size for VMs')
+    parser_start.add_argument('--network-limit-bandwidth', type=str, default="20mbit", help='Network limit bandwidth')
     #init options
     parser_start.add_argument('--privileged', '-P', action='store_true', help='Use privileged mode for VMs')
     parser_start.add_argument('--expose-gameserver', '-E', action='store_true', help='Expose gameserver port')
@@ -269,14 +262,19 @@ def write_compose(data):
                     "build": "./router",
                     "cap_add": [
                         "NET_ADMIN",
-                        "SYS_MODULE"
+                        "SYS_MODULE",
+                        "SYS_ADMIN",
                     ],
                     "sysctls": [
                         "net.ipv4.ip_forward=1",
-                        "net.ipv4.tcp_timestamps=0"
+                        "net.ipv4.tcp_timestamps=0",
+                        "net.ipv4.conf.all.rp_filter=1",
+                        "net.ipv6.conf.all.forwarding=0",
+                        "net.ipv6.conf.eth0.autoconf=0"
                     ],
                     "environment": {
-                        "NTEAM": len(data['teams'])
+                        "NTEAM": len(data['teams']),
+                        "RATE_NET": data['network_limit_bandwidth'],
                     },
                     "volumes": [
                         "unixsk:/unixsk/"
@@ -359,7 +357,8 @@ def write_compose(data):
                         "dns": [data['dns']],
                         "cap_add": [
                             "CAP_AUDIT_WRITE",
-                            "NET_ADMIN"
+                            "NET_ADMIN",
+                            "NET_RAW",
                         ],
                         "security_opt":[
                             "label=disable",
@@ -370,7 +369,7 @@ def write_compose(data):
                                 "TOKEN": team['token'],
                             }
                         },
-                        **({ "storage_opt": ["size="+data['max_disk_size']] } if args.disk_limit else {}),
+                        **({ "storage_opt": {"size":data['max_disk_size']} } if args.disk_limit else {}),
                         "sysctls": [
                             "net.ipv4.ip_unprivileged_port_start=1" #Allow non-privilaged podman to bind all ports
                         ],
@@ -559,18 +558,18 @@ def dict_to_yaml(data, indent_spaces:int=4, base_indent:int=0, additional_spaces
         yaml += f"{data}\n"
     return yaml
 
-def generate_teams_array(data):
+def generate_teams_array(number_of_teams: int, enable_nop_team: bool, wireguard_start_port: int):
     teams = []
-    for i in range(data['number_of_teams']+ (1 if data['enable_nop_team'] else 0)):
+    for i in range(number_of_teams + (1 if enable_nop_team else 0)):
         team = {
             'id': i,
             'name': f'Team {i}',
             'token': secrets.token_hex(32),
-            'wireguard_port': data['wireguard_start_port']+i,
+            'wireguard_port': wireguard_start_port+i,
             'nop': False,
             'image': "null"
         }
-        if i == 0 and data['enable_nop_team']:
+        if i == 0 and enable_nop_team:
             team['nop'] = True
             team['name'] = 'Nop Team'
         teams.append(team)
@@ -588,7 +587,6 @@ def config_input():
             print('Number of teams must be less or equal than 250')
         else:
             break
-    data['number_of_teams'] = number_of_teams
     if args.wireguard_start_port <= 0:
         print('Wireguard start port must be greater than 0')
         exit(1)
@@ -608,8 +606,9 @@ def config_input():
     data['start_time'] = datetime.fromisoformat(args.start_time).isoformat() if args.start_time else None
     data['end_time'] = datetime.fromisoformat(args.end_time).isoformat() if args.end_time else None
     data['submission_timeout'] = args.submission_timeout
-    data['enable_nop_team'] = input('Enable NOP team? (Y/n): ').lower() != 'n'
+    enable_nop_team = input('Enable NOP team? (Y/n): ').lower() != 'n'
     data['server_addr'] = input('Server address: ')
+    data['network_limit_bandwidth'] = args.network_limit_bandwidth
     data['max_disk_size'] = args.max_disk_size
     
     while True:
@@ -619,7 +618,7 @@ def config_input():
         except Exception:
             print('Invalid tick time')
             pass
-    data['teams'] = generate_teams_array(data)
+    data['teams'] = generate_teams_array(number_of_teams, enable_nop_team, args.wireguard_start_port)
     return data
 
 def create_config(data):
@@ -635,7 +634,8 @@ def read_config():
         return json.load(f)
 
 def write_gameserver_config(data):
-    nop_team = data['teams'][0]['id'] if data['enable_nop_team'] else None
+    nop_team = list(filter(lambda x: x['nop'], data['teams']))
+    nop_team = nop_team[0]['id'] if nop_team else None
     gameserver_config = {
         "log_level": data['gameserver_log_level'],
         "round_len": data['tick_time']*1000,
@@ -693,14 +693,13 @@ def main():
                     puts("Clearing old setup images and volumes", color=colors.yellow)
                     clear_data(remove_config=False)
                 elif args.rebuild:
-                    clear_data(remove_config=False, remove_checkers_data=False, remove_gameserver_data=False, remove_wireguard=False)
+                    clear_data(remove_config=False, remove_checkers_data=False, remove_gameserver_data=False, remove_wireguard=False, remove_prebuilder_image=False)
                 write_gameserver_config(config)
                 if not prebuilt_exists():
                     if not (args.reset or args.rebuild):
                         puts("Prebuilt image not found!", color=colors.yellow)
                         puts("Clearing old setup images...", color=colors.yellow)
                         #If these images exists, we need to remove them to avoid errors
-                        remove_prebuilder()
                         remove_prebuilded()
                         remove_prebuilt()
                     puts("Building the prebuilder image", color=colors.yellow)
@@ -716,7 +715,6 @@ def main():
                         puts("Error commiting prebuilt image", color=colors.red)
                         exit(1)
                     puts("Clear unused images", color=colors.yellow)
-                    remove_prebuilder()
                     remove_prebuilded()
                 
                 if not config_exists():
