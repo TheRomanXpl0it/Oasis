@@ -9,7 +9,7 @@ pin_digits = 6
 
 @admin_blueprint.route('/login', methods=['POST'])
 def admin_login():
-    time.sleep(1.5) # Avoid brute force attacks
+    time.sleep(0.3) # Avoid brute force attacks
     data = request.get_json()
     token = data.get('token')
 

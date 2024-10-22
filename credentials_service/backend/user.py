@@ -9,7 +9,7 @@ downloaded_configs = {}
 
 @user_blueprint.route('/login', methods=['POST'])
 def user_login():
-    time.sleep(1.5) # Avoid brute force attacks
+    time.sleep(0.3) # Avoid brute force attacks
     pin = request.json.get('pin')
     
     teams_data = load_teams_data()
