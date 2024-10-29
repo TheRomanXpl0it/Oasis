@@ -6,6 +6,8 @@
 - Infrastructure
 - System
 
+![screencapture_scoreboard_ad_pwnzer0tt1_it_scoreboard_2024_10_26](https://github.com/user-attachments/assets/bdab4b38-d919-44f9-af72-c0422c14129d)
+
 ## Introduction
 Oasis is an open-source project designed to provide a simple and robust infrastructure for attack and defense simulations. It facilitates cybersecurity training and testing through various components and services.
 
