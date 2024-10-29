@@ -135,6 +135,7 @@ func retriveFlagIDs(w http.ResponseWriter, r *http.Request) {
 		flagIDs[flag.Service][flag.Team] = append(flagIDs[flag.Service][flag.Team], flag.ExternalFlagId.K)
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	if err := enc.Encode(flagIDs); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		log.Errorf("Error encoding flag_ids: %v", err)

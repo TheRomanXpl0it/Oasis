@@ -85,7 +85,7 @@ func handleChart(w http.ResponseWriter, r *http.Request) {
 			Scores: scores,
 		}
 	}
-
+	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Errorf("Error encoding response: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -161,7 +161,7 @@ func handleScoreboard(w http.ResponseWriter, r *http.Request) {
 			Services: services,
 		})
 	}
-
+	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Errorf("Error encoding response: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -232,6 +232,7 @@ func handleTeam(w http.ResponseWriter, r *http.Request) {
 
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Errorf("Error encoding response: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -289,6 +290,7 @@ func handleConfig(w http.ResponseWriter, r *http.Request) {
 		endTime = &endTimeStr
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(ConfigAPIResponse{
 		Teams:               teams,
 		Services:            conf.Services,

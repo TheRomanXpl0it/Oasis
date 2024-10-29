@@ -190,6 +190,7 @@ func submitFlags(w http.ResponseWriter, r *http.Request) {
 	submittedFlags = submittedFlags[:min(len(submittedFlags), conf.MaxFlagsPerRequest)]
 	responses := elaborateFlags(team, submittedFlags, uint(currentTick))
 
+	w.Header().Set("Content-Type", "application/json")
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(responses); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
