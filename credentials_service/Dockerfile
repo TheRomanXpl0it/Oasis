@@ -7,7 +7,7 @@ COPY frontend/ .
 RUN bun run build
 
 
-FROM python:3.12-slim
+FROM public.ecr.aws/docker/library/python:3.12-slim
 
 WORKDIR /app
 COPY backend/requirements.txt .

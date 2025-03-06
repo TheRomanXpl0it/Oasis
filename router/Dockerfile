@@ -1,4 +1,4 @@
-FROM alpine
+FROM public.ecr.aws/docker/library/alpine:latest
 
 RUN apk update && apk add iptables iproute2 bash ethtool tcpdump \
     traceroute netcat-openbsd socat iproute2-tc

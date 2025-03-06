@@ -6,7 +6,7 @@ RUN bun install
 COPY ./frontend/ .
 RUN bun run build
 
-FROM golang:1.24
+FROM public.ecr.aws/docker/library/golang:1.24
 
 WORKDIR /app/
 
