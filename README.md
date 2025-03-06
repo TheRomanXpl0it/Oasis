@@ -34,7 +34,7 @@ For running Oasis, you need podman (docker cannot be used due to avoid using pri
 After that you can run the following command to start the Oasis infrastructure:
 
 ```bash
-python3 start.py start
+sudo python3 start.py start
 ```
 
 To connect to the VMs, you need to use one of the wireguard configurations in the wireguard folder.

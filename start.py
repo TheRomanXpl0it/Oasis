@@ -130,8 +130,6 @@ def gen_args(args_to_parse: list[str]|None = None):
     
     #Main parser
     parser = argparse.ArgumentParser(description=f"{g.name} Manager")
-    
-    parser.add_argument('--delete-all', dest="bef_clear", required=False, action="store_true", help=f'Delete volumes folder associated to {g.name} and oasis json config', default=False)
 
     subcommands = parser.add_subparsers(dest="command", help="Command to execute", required=True)
     
@@ -169,7 +167,8 @@ def gen_args(args_to_parse: list[str]|None = None):
 
     #Stop Command
     parser_stop = subcommands.add_parser('stop', help=f'Stop {g.name}')
-    parser_stop.add_argument('--delete-all', required=False, action="store_true", help=f'Delete podman volume associated to {g.name} resetting all the settings', default=False)
+    parser_stop.add_argument('--delete-all', required=False, action="store_true", help=f'Delete podman volume associated to {g.name} and oasis json config', default=False)
+    parser_stop.add_argument('--clear', required=False, action="store_true", help=f'Delete podman volume associated to {g.name}', default=False)
     
     parser_restart = subcommands.add_parser('restart', help=f'Restart {g.name}')
     parser_restart.add_argument('--logs', required=False, action="store_true", help=f'Show {g.name} logs', default=False)
@@ -184,6 +183,9 @@ def gen_args(args_to_parse: list[str]|None = None):
     
     if "delete_all" not in args:
         args.delete_all = False
+        
+    if "clear" not in args:
+        args.clear = False
 
     if "privileged" not in args:
         args.privileged = False
@@ -200,8 +202,6 @@ def gen_args(args_to_parse: list[str]|None = None):
     if not check_for_quotas() and args.disk_limit:
         if not ask_for_quota_command():
             exit(1)
-        
-    args.delete_all = args.bef_clear or args.delete_all
 
     return args
 
@@ -732,11 +732,11 @@ def main():
     
 
     
-    if args.delete_all:
+    if args.delete_all or args.clear:
         if check_already_running():
             puts(f"{g.name} is running! please stop it before clear the data", color=colors.red)
             exit(1)
-        clear_data()
+        clear_data(remove_config=args.delete_all)
         puts("Volumes and config clean!", color=colors.green, is_bold=True)
 
     if "logs" in args and args.logs:
