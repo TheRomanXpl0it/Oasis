@@ -11,7 +11,7 @@ RUN dnf -y makecache && \
     python3-pip python3-virtualenv screen nc btop htop neovim iptables-nft \
     nano curl git wget unzip zip traceroute net-tools fuse-overlayfs rsync \
     openssh-server openssl ucpp python3-pyyaml python3-dotenv --exclude container-selinux &&\
-    ln -s /usr/bin/ucpp /usr/local/bin/cpp && dnf clean all
+    ln -sf /usr/bin/ucpp /usr/local/bin/cpp && dnf clean all
 
 RUN useradd oasis -G wheel,root && \
     echo -e "oasis:1:999\noasis:1001:64535" > /etc/subuid && \
@@ -49,12 +49,12 @@ ENV _CONTAINERS_USERNS_CONFIGURED="" \
     PODMAN_COMPOSE_WARNING_LOGS=false \
     LANG=C.UTF-8
 
-RUN ln -s /usr/bin/podman /usr/bin/docker && \
+RUN ln -sf /usr/bin/podman /usr/bin/docker && \
     ln -sf /usr/share/zoneinfo/Europe/Rome /etc/localtime && \
     ln -sf /usr/sbin/iptables-nft /usr/sbin/iptables
 
 # SSH
-RUN mkdir /var/run/sshd
+RUN mkdir -p /var/run/sshd
 
 # Services
 COPY ./services/ /root/

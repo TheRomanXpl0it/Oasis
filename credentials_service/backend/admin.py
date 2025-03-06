@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token, jwt_required
-from utils import load_teams_data, save_teams_data, get_current_user, config_file_lock
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from utils import load_teams_data
 import time
 
 admin_blueprint = Blueprint('admin', __name__)
@@ -14,15 +14,14 @@ def admin_login():
     token = data.get('token')
 
     if token == load_teams_data()['gameserver_token']:
-        access_token = create_access_token(identity={'is_admin': True})
+        access_token = create_access_token(identity="admin")
         return jsonify(access_token=access_token), 200
     return jsonify({"msg": "Invalid credentials"}), 401
 
 @admin_blueprint.route('/teams', methods=['GET'])
 @jwt_required()
 def get_teams():
-    current_user = get_current_user()
-    if not current_user.get('is_admin', False):
+    if get_jwt_identity() != "admin":
         return jsonify({"msg": "Forbidden: Admin access required"}), 403
     
     teams_data = load_teams_data()

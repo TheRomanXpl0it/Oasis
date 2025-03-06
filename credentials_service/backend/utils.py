@@ -1,4 +1,3 @@
-from flask_jwt_extended import get_jwt_identity
 import json
 import os
 from fasteners import InterProcessLock
@@ -10,9 +9,6 @@ DEBUG = os.getenv('DEBUG', "0").strip() == "1"
 TEAMS_DATA_FILE = os.path.join(BASE_DIR, 'oasis-setup-config.json' if not DEBUG else '../../oasis-setup-config.json')
 
 config_file_lock = InterProcessLock(os.path.join(BASE_DIR, "teams_data.json.lock"))
-
-def get_current_user():
-    return get_jwt_identity()
 
 def load_teams_data():
     with open(TEAMS_DATA_FILE, 'r') as f:

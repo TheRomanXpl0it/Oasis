@@ -6,4 +6,4 @@ services:
       - ../oasis-setup-config.json:/app/oasis-setup-config.json:z
       - ../wireguard:/app/wireguard:z
     ports:
-      - "127.0.0.1:4040:4040"
+      - "4040:4040"

@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse, sys, os, subprocess
-import json, secrets, shutil
+import argparse
+import sys
+import os
+import subprocess
+import json
+import secrets
+import shutil
 from datetime import datetime
 
 pref = "\033["
@@ -40,7 +45,7 @@ def dict_to_yaml(data, indent_spaces:int=4, base_indent:int=0, additional_spaces
     spaces = ' '*((indent_spaces*base_indent)+additional_spaces)
     if isinstance(data, dict):
         for key, value in data.items():
-            if not add_text_on_dict is None:
+            if add_text_on_dict is not None:
                 spaces_len = len(spaces)-len(add_text_on_dict)
                 spaces = (' '*max(spaces_len, 0))+add_text_on_dict
                 add_text_on_dict = None
@@ -107,7 +112,7 @@ def remove_prebuilded():
     return cmd_check(f'podman container rm {g.prebuilded_container}')
 
 def remove_database_volume():
-    return cmd_check(f'podman volume rm -f oasis_oasis-postgres-db')
+    return cmd_check('podman volume rm -f oasis_oasis-postgres-db')
 
 def build_prebuilder():
     return cmd_check(f'podman build -t {g.prebuild_image} -f ./vm/Dockerfile.prebuilder ./vm/', print_output=True)
@@ -126,7 +131,7 @@ def gen_args(args_to_parse: list[str]|None = None):
     #Main parser
     parser = argparse.ArgumentParser(description=f"{g.name} Manager")
     
-    parser.add_argument('--clear', dest="bef_clear", required=False, action="store_true", help=f'Delete volumes folder associated to {g.name} and oasis json config', default=False)
+    parser.add_argument('--delete-all', dest="bef_clear", required=False, action="store_true", help=f'Delete volumes folder associated to {g.name} and oasis json config', default=False)
 
     subcommands = parser.add_subparsers(dest="command", help="Command to execute", required=True)
     
@@ -137,8 +142,8 @@ def gen_args(args_to_parse: list[str]|None = None):
     #Start Command
     parser_start = subcommands.add_parser('start', help=f'Start {g.name}')
     parser_start.add_argument('--logs', required=False, action="store_true", help=f'Show {g.name} logs', default=False)
-    parser_start.add_argument('--reset', required=False, action="store_true", help=f'Regenerate VM base image and configuration', default=False)
-    parser_start.add_argument('--rebuild', required=False, action="store_true", help=f'Rebuild VM base image', default=False)
+    parser_start.add_argument('--reset', required=False, action="store_true", help='Regenerate VM base image and configuration', default=False)
+    parser_start.add_argument('--rebuild', required=False, action="store_true", help='Rebuild VM base image', default=False)
     #Gameserve options
     parser_start.add_argument('--wireguard-start-port', type=int, default=51000, help='Wireguard start port')
     parser_start.add_argument('--gameserver-log-level', default="info", help='Log level for game server')
@@ -164,7 +169,7 @@ def gen_args(args_to_parse: list[str]|None = None):
 
     #Stop Command
     parser_stop = subcommands.add_parser('stop', help=f'Stop {g.name}')
-    parser_stop.add_argument('--clear', required=False, action="store_true", help=f'Delete podman volume associated to {g.name} resetting all the settings', default=False)
+    parser_stop.add_argument('--delete-all', required=False, action="store_true", help=f'Delete podman volume associated to {g.name} resetting all the settings', default=False)
     
     parser_restart = subcommands.add_parser('restart', help=f'Restart {g.name}')
     parser_restart.add_argument('--logs', required=False, action="store_true", help=f'Show {g.name} logs', default=False)
@@ -173,30 +178,30 @@ def gen_args(args_to_parse: list[str]|None = None):
     parser_restart.add_argument('--expose-gameserver', '-E', action='store_true', help='Expose gameserver port')
     parser_restart.add_argument('--gameserver-port', default="127.0.0.1:8888", help='Gameserver port')
     
-    subcommands.add_parser('enable-quotas', help=f'Enable quotas for VMs (Need XFS and this file has to be running directly in the host) (Need to be run only once)')
+    subcommands.add_parser('enable-quotas', help='Enable quotas for VMs (Need XFS and this file has to be running directly in the host) (Need to be run only once)')
     
     args = parser.parse_args(args=args_to_parse)
     
-    if not "clear" in args:
-        args.clear = False
+    if "delete_all" not in args:
+        args.delete_all = False
 
-    if not "privileged" in args:
+    if "privileged" not in args:
         args.privileged = False
         
-    if not "expose_gameserver" in args:
+    if "expose_gameserver" not in args:
         args.expose_gameserver = False
         
-    if not "gameserver_port" in args:
+    if "gameserver_port" not in args:
         args.gameserver_port = "127.0.0.1:8888"
     
-    if not "disk_limit" in args:
+    if "disk_limit" not in args:
         args.disk_limit = False
     
     if not check_for_quotas() and args.disk_limit:
         if not ask_for_quota_command():
             exit(1)
         
-    args.clear = args.bef_clear or args.clear
+    args.delete_all = args.bef_clear or args.delete_all
 
     return args
 
@@ -227,7 +232,7 @@ def check_for_quotas():
         try:
             with open(filename, 'r') as f:
                 data = f.read()
-            if not data_to_write in data:
+            if data_to_write not in data:
                 return False
         except FileNotFoundError:
             return False
@@ -240,7 +245,7 @@ def enable_quotas():
                 data = f.read()
         except FileNotFoundError:
             data = ""
-        if not data_to_write in data:
+        if data_to_write not in data:
             with open(filename, 'a') as f:
                 f.write(data_to_write+'\n')
 
@@ -257,7 +262,7 @@ def write_compose(data):
         compose.write(dict_to_yaml({
             "services": {
                 "router": {
-                    "hostname": f"router",
+                    "hostname": "router",
                     "dns": [data['dns']],
                     "build": "./router",
                     "cap_add": [
@@ -302,7 +307,7 @@ def write_compose(data):
                     }
                 },
                 "database": {
-                    "hostname": f"oasis-database",
+                    "hostname": "oasis-database",
                     "dns": [data['dns']],
                     "image": "postgres:17",
                     "restart": "unless-stopped",
@@ -319,7 +324,7 @@ def write_compose(data):
                     }
                 },
                 "gameserver": {
-                    "hostname": f"gameserver",
+                    "hostname": "gameserver",
                     "dns": [data['dns']],
                     "build": "./game_server",
                     "restart": "unless-stopped",
@@ -424,8 +429,8 @@ def write_compose(data):
                             f"{data['wireguard_start_port']+team['id']}:51820/udp"
                         ],
                         "environment": {
-                            "PUID": 1000,
-                            "PGID": 1000,
+                            "PUID": 0,
+                            "PGID": 0,
                             "TZ": "Etc/UTC",
                             "PEERS": data['wireguard_profiles'],
                             "PEERDNS": data['dns'],
@@ -531,33 +536,6 @@ def try_mkdir(path):
     except FileExistsError:
         pass
 
-def dict_to_yaml(data, indent_spaces:int=4, base_indent:int=0, additional_spaces:int=0, add_text_on_dict:str|None=None):
-    yaml = ''
-    spaces = ' '*((indent_spaces*base_indent)+additional_spaces)
-    if isinstance(data, dict):
-        for key, value in data.items():
-            if not add_text_on_dict is None:
-                spaces_len = len(spaces)-len(add_text_on_dict)
-                spaces = (' '*max(spaces_len, 0))+add_text_on_dict
-                add_text_on_dict = None
-            if isinstance(value, dict) or isinstance(value, list):
-                yaml += f"{spaces}{key}:\n"
-                yaml += dict_to_yaml(value, indent_spaces=indent_spaces, base_indent=base_indent+1, additional_spaces=additional_spaces)
-            else:
-                yaml += f"{spaces}{key}: {value}\n"
-            spaces = ' '*((indent_spaces*base_indent)+additional_spaces)
-    elif isinstance(data, list):
-        for item in data:
-            if isinstance(item, dict):
-                yaml += dict_to_yaml(item, indent_spaces=indent_spaces, base_indent=base_indent, additional_spaces=additional_spaces+2, add_text_on_dict="- ")
-            elif isinstance(item, list):
-                yaml += dict_to_yaml(item, indent_spaces=indent_spaces, base_indent=base_indent+1, additional_spaces=additional_spaces)
-            else:
-                yaml += f"{spaces}- {item}\n"
-    else:
-        yaml += f"{data}\n"
-    return yaml
-
 def generate_teams_array(number_of_teams: int, enable_nop_team: bool, wireguard_start_port: int):
     teams = []
     for i in range(number_of_teams + (1 if enable_nop_team else 0)):
@@ -640,7 +618,7 @@ def write_gameserver_config(data):
         "log_level": data['gameserver_log_level'],
         "round_len": data['tick_time']*1000,
         "token": data['gameserver_token'],
-        "nop": f"10.60.{nop_team}.1" if not nop_team is None else "null",
+        "nop": f"10.60.{nop_team}.1" if nop_team is not None else "null",
         "submitter_limit": data['submission_timeout']*1000,
         "teams": {
             **{
@@ -754,12 +732,12 @@ def main():
     
 
     
-    if args.clear:
+    if args.delete_all:
         if check_already_running():
             puts(f"{g.name} is running! please stop it before clear the data", color=colors.red)
             exit(1)
         clear_data()
-        puts(f"Volumes and config clean!", color=colors.green, is_bold=True)
+        puts("Volumes and config clean!", color=colors.green, is_bold=True)
 
     if "logs" in args and args.logs:
         if config_exists():
