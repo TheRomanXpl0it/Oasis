@@ -4,18 +4,17 @@
 # THIS IS NOT A CHALLENGE, IS THE SETUP OF THE VM #
 ###################################################
 
-# podman ps is used to avoid podman compose crash on first run
-podman ps &> /dev/null
-
-
 if [[ "$1" == "prebuild" ]]; then
-    podman --log-level=info system service --time=0 &>> /home/oasis/podman.log &
+    dockerd > /var/log/dockerd.log 2>&1 &
+    while [[ ! $(docker ps 2> /dev/null) ]]; do
+        sleep 1
+    done
     # Only with this for loop we can exit internally from the loop
     for path in $(find /root/ -maxdepth 1 -mindepth 1 -type d); do
         if [[ -f "$path/compose.yml" || -f "$path/compose.yaml" || -f "$path/docker-compose.yml" || -f "$path/docker-compose.yaml" ]]; then
             cd $path
             echo "Building $path"
-            podman compose build
+            docker compose build
             EXITCODE=$?
             echo "Build of $path exited with $EXITCODE"
             if [[ "$EXITCODE" != 0 ]]; then
@@ -28,7 +27,11 @@ if [[ "$1" == "prebuild" ]]; then
     exit 0
 fi
 if [[ "$1" == "entry" ]]; then
-    podman --log-level=info system service --time=0 &>> /home/oasis/podman.log &
+
+    while [[ ! $(docker ps 2> /dev/null) ]]; do
+        sleep 1
+    done
+
     TEAM_ID=$(ip a | grep -oP '((?<=)10.60.+.1\/24(?=))' | cut -d'.' -f3)
     # Set up network
     ip link set eth0 name game
@@ -55,8 +58,6 @@ root	ALL=(ALL) 	ALL
 EOF
     mkdir -p /var/run/sshd
     ssh-keygen -t rsa -f /etc/ssh/ssh_host_rsa_key -N ''
-    /usr/sbin/sshd -D -E /var/log/sshd.log &
-    SSDPID=$!
 
     find /root/ -maxdepth 1 -mindepth 1 -type d -print0 | while read -d $'\0' path
     do
@@ -66,11 +67,10 @@ EOF
                 echo "Executing predeploy.sh"
                 bash predeploy.sh
             fi
-            podman compose up -d --build
+            docker compose up -d --build
         fi
     done
 
-    trap "kill $SSDPID" EXIT
     tail -f /dev/null
     
 fi
@@ -85,4 +85,3 @@ fi
 # fi
 
 #To generate an .env file with a random SECRET_KEY different for each team
-

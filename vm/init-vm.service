@@ -1,0 +1,8 @@
+[Unit]
+Description=VM init service
+
+[Service]
+ExecStart=/usr/bin/_entry_vm_init entry
+
+[Install]
+WantedBy=multi-user.target

@@ -1,10 +1,11 @@
 FROM oasis-vm-base:latest
 
-USER root
-WORKDIR /root
-
 ARG TOKEN
 ENV TOKEN=$TOKEN
 RUN echo "root:${TOKEN:-root}" | chpasswd
 
-CMD [ "/sbin/init", "entry" ]
+ARG TEAM_NAME
+ENV TEAM_NAME=$TEAM_NAME
+RUN echo $TEAM_NAME >> /etc/teamname
+
+ENTRYPOINT [ "/sbin/init", "--log-level=err" ]
