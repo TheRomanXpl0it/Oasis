@@ -283,7 +283,8 @@ def write_compose(data):
                     } if args.expose_gameserver else {}),
                     "depends_on": [
                         "router",
-                        "database"
+                        "database",
+                        *[f"team{ele['id']}" for ele in data['teams']]
                     ],
                     "networks": {
                         "internalnet": {
