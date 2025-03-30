@@ -145,7 +145,7 @@ print(requests.put('http://10.10.0.1:8080/flags', headers={
     ...
 }`}
         </Code>
-        <Text mt="md">The flag id format depends on the service, anche could be also not exist for a particular service</Text>
+        <Text mt="md">The flag id format depends on the service, and could also not exist for a particular service</Text>
         <Title order={2} mt="lg">Technical and Human Behaviour</Title>
 
         <Text mt="lg">We'd like everyone to enjoy a fair game. For this reason we ask you to follow these simple rules:</Text>
