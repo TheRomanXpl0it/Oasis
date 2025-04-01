@@ -606,7 +606,7 @@ def main():
             case "start":
                 if check_already_running():
                     puts(f"{g.name} is already running!", color=colors.yellow)
-                if args.reset or not config_exists() or args.config_only:
+                if not config_exists() or args.config_only:
                     config = config_input()
                     create_config(config)
                 else:
@@ -616,12 +616,11 @@ def main():
                     return
                 write_gameserver_config(config)
                 if not prebuilt_exists():
-                    if not (args.reset or args.rebuild):
-                        puts("Prebuilt image not found!", color=colors.yellow)
-                        puts("Clearing old setup images...", color=colors.yellow)
-                        #If these images exists, we need to remove them to avoid errors
-                        remove_prebuilded()
-                        remove_prebuilt()
+                    puts("Prebuilt image not found!", color=colors.yellow)
+                    puts("Clearing old setup images...", color=colors.yellow)
+                    #If these images exists, we need to remove them to avoid errors
+                    remove_prebuilded()
+                    remove_prebuilt()
                     puts("Building the prebuilder image", color=colors.yellow)
                     if not build_prebuilder():
                         puts("Error building prebuilder image", color=colors.red)
