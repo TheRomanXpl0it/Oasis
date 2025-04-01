@@ -93,8 +93,6 @@ def gen_args(args_to_parse: list[str]|None = None):
     #Start Command
     parser_start = subcommands.add_parser('start', help=f'Start {g.name}')
     parser_start.add_argument('--logs', required=False, action="store_true", help=f'Show {g.name} logs', default=False)
-    parser_start.add_argument('--reset', required=False, action="store_true", help='Regenerate VM base image and configuration', default=False)
-    parser_start.add_argument('--rebuild', required=False, action="store_true", help='Rebuild VM base image', default=False)
     #Gameserve options
     parser_start.add_argument('--wireguard-start-port', type=int, default=51000, help='Wireguard start port')
     parser_start.add_argument('--gameserver-log-level', default="info", help='Log level for game server')
@@ -117,27 +115,31 @@ def gen_args(args_to_parse: list[str]|None = None):
     parser_start.add_argument('--config-only', '-C', action='store_true', help='Only generate config file')
     parser_start.add_argument('--disk-limit', '-D', action='store_true', help='Limit disk size for VMs (NEED TO ENABLE QUOTAS)')
 
-
     #Stop Command
     parser_stop = subcommands.add_parser('stop', help=f'Stop {g.name}')
-    parser_stop.add_argument('--delete-all', required=False, action="store_true", help=f'Delete docker volume associated to {g.name} and oasis json config', default=False)
-    parser_stop.add_argument('--clear', required=False, action="store_true", help=f'Delete docker volume associated to {g.name}', default=False)
     
+    #Restart Command
     parser_restart = subcommands.add_parser('restart', help=f'Restart {g.name}')
     parser_restart.add_argument('--logs', required=False, action="store_true", help=f'Show {g.name} logs', default=False)
     parser_restart.add_argument('--privileged', '-P', action='store_true', help='Use privileged mode for VMs')
     parser_restart.add_argument('--disk-limit', '-D', action='store_true', help='Limit disk size for VMs')
     parser_restart.add_argument('--expose-gameserver', '-E', action='store_true', help='Expose gameserver port')
     parser_restart.add_argument('--gameserver-port', default="127.0.0.1:8888", help='Gameserver port')
+
+    #Clear Command
+    parser_clear = subcommands.add_parser('clear', help='Clear data')
+    parser_clear.add_argument('--all', '-A', action='store_true', help='Clear everything')
+    parser_clear.add_argument('--config', '-C', action='store_true', help='Clear config file')
+    parser_clear.add_argument('--prebuilded-container', '-P', action='store_true', help='Clear prebuilded container')
+    parser_clear.add_argument('--prebuilder-image', '-B', action='store_true', help='Clear prebuilder image')
+    parser_clear.add_argument('--prebuilt-image', '-I', action='store_true', help='Clear prebuilt image')
+    parser_clear.add_argument('--wireguard', '-W', action='store_true', help='Clear wireguard data')
+    parser_clear.add_argument('--checkers-data', '-D', action='store_true', help='Clear checkers data')
+    parser_clear.add_argument('--gameserver-config', '-G', action='store_true', help='Clear gameserver config')
+    parser_clear.add_argument('--gameserver-data', '-D', action='store_true', help='Clear gameserver data')
     
     args = parser.parse_args(args=args_to_parse)
     
-    if "delete_all" not in args:
-        args.delete_all = False
-        
-    if "clear" not in args:
-        args.clear = False
-
     if "privileged" not in args:
         args.privileged = False
         
@@ -456,6 +458,27 @@ def clear_data(
         for service in os.listdir("./game_server/checkers"):
             shutil.rmtree(f"./game_server/checkers/{service}/flag_ids", ignore_errors=True)
 
+def clear_data_only(
+    remove_config=False,
+    remove_prebuilded_container=False,
+    remove_prebuilder_image=False,
+    remove_prebuilt_image=False,
+    remove_wireguard=False,
+    remove_checkers_data=False,
+    remove_gameserver_config=False,
+    remove_gameserver_data=False
+):
+    clear_data(
+        remove_config=remove_config,
+        remove_prebuilded_container=remove_prebuilded_container,
+        remove_prebuilder_image=remove_prebuilder_image,
+        remove_prebuilt_image=remove_prebuilt_image,
+        remove_wireguard=remove_wireguard,
+        remove_checkers_data=remove_checkers_data,
+        remove_gameserver_config=remove_gameserver_config,
+        remove_gameserver_data=remove_gameserver_data
+    )
+
 def try_mkdir(path):
     try:
         os.mkdir(path)
@@ -589,22 +612,8 @@ def main():
                 else:
                     config = read_config()
                 if args.config_only:
-                    puts(f"Config file generated!, you can customize editing {g.config_file}", color=colors.green)
+                    puts(f"Config file generated!, you can customize it by editing {g.config_file}", color=colors.green)
                     return
-                if args.reset:
-                    puts("Clearing old setup images and volumes", color=colors.yellow)
-                    clear_data(remove_config=False)
-                elif args.rebuild:
-                    clear_data(
-                        remove_config=False,
-                        remove_prebuilded_container=True,
-                        remove_prebuilder_image=True,
-                        remove_prebuilt_image=True,
-                        remove_wireguard=True,
-                        remove_checkers_data=True,
-                        remove_gameserver_config=True,
-                        remove_gameserver_data=True
-                    )
                 write_gameserver_config(config)
                 if not prebuilt_exists():
                     if not (args.reset or args.rebuild):
@@ -617,11 +626,11 @@ def main():
                     if not build_prebuilder():
                         puts("Error building prebuilder image", color=colors.red)
                         exit(1)
-                    puts("Executing prebuilder to creating VMs base image", color=colors.yellow)
+                    puts("Executing prebuilder to create VMs' base image", color=colors.yellow)
                     if not build_prebuilt():
                         puts("Error building prebuilt image", color=colors.red)
                         exit(1)
-                    puts("Creating base VM image (this action takes time and gives no output)", color=colors.yellow)
+                    puts("Creating base VM image (this action can take a while and produces no output)", color=colors.yellow)
                     if not commit_prebuilt():
                         puts("Error commiting prebuilt image", color=colors.red)
                         exit(1)
@@ -662,16 +671,35 @@ def main():
                     composecmd("down --remove-orphans", g.composefile)
                 else:
                     puts(f"{g.name} is not running!" , color=colors.red, is_bold=True, flush=True)
-    
+            case "clear":
+                if check_already_running():
+                    puts(f"{g.name} is running! please stop it before clearing the data", color=colors.red)
+                    exit(1)
+                if args.all:
+                    puts("This will clear everything, EVEN THE CONFIG JSON, are you sure? (y/N): ", end="")
+                    if input().lower() != 'y':
+                        break
+                    puts("Clearing everything (even config!!)", color=colors.yellow)
+                    clear_data()
+                if args.config:
+                    clear_data_only(remove_config=True)
+                if args.prebuilded_container:
+                    clear_data_only(remove_prebuilded_container=True)
+                if args.prebuilder_image:
+                    clear_data_only(remove_prebuilder_image=True)
+                if args.prebuilt_image:
+                    clear_data_only(remove_prebuilt_image=True)
+                if args.wireguard:
+                    clear_data_only(remove_wireguard=True)
+                if args.checkers_data:
+                    clear_data_only(remove_checkers_data=True)
+                if args.gameserver_config:
+                    clear_data_only(remove_gameserver_config=True)
+                if args.gameserver_data:
+                    clear_data_only(remove_gameserver_data=True)
+                puts("Whatever you specified has been cleared!", color=colors.green, is_bold=True)
 
     
-    if args.delete_all or args.clear:
-        if check_already_running():
-            puts(f"{g.name} is running! please stop it before clear the data", color=colors.red)
-            exit(1)
-        clear_data(remove_config=args.delete_all)
-        puts("Volumes and config clean!", color=colors.green, is_bold=True)
-
     if "logs" in args and args.logs:
         if config_exists():
             write_compose(read_config())
