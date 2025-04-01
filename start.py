@@ -129,14 +129,14 @@ def gen_args(args_to_parse: list[str]|None = None):
     #Clear Command
     parser_clear = subcommands.add_parser('clear', help='Clear data')
     parser_clear.add_argument('--all', '-A', action='store_true', help='Clear everything')
-    parser_clear.add_argument('--config', '-C', action='store_true', help='Clear config file')
+    parser_clear.add_argument('--config', '-c', action='store_true', help='Clear config file')
     parser_clear.add_argument('--prebuilded-container', '-P', action='store_true', help='Clear prebuilded container')
     parser_clear.add_argument('--prebuilder-image', '-B', action='store_true', help='Clear prebuilder image')
     parser_clear.add_argument('--prebuilt-image', '-I', action='store_true', help='Clear prebuilt image')
     parser_clear.add_argument('--wireguard', '-W', action='store_true', help='Clear wireguard data')
-    parser_clear.add_argument('--checkers-data', '-D', action='store_true', help='Clear checkers data')
-    parser_clear.add_argument('--gameserver-config', '-G', action='store_true', help='Clear gameserver config')
-    parser_clear.add_argument('--gameserver-data', '-D', action='store_true', help='Clear gameserver data')
+    parser_clear.add_argument('--checkers-data', '-C', action='store_true', help='Clear checkers data')
+    parser_clear.add_argument('--gameserver-config', '-S', action='store_true', help='Clear gameserver config')
+    parser_clear.add_argument('--gameserver-data', '-G', action='store_true', help='Clear gameserver data')
     
     args = parser.parse_args(args=args_to_parse)
     
