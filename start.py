@@ -688,7 +688,7 @@ def main():
                 else:
                     config = read_config()
                 if args.config_only:
-                    puts(f"Config file generated!, you can customize editing {g.config_file}", color=colors.green)
+                    puts(f"Config file generated!, you can customize it by editing {g.config_file}", color=colors.green)
                     return
                 write_gameserver_config(config)
                 if not prebuilt_exists():
@@ -702,11 +702,11 @@ def main():
                     if not build_prebuilder():
                         puts("Error building prebuilder image", color=colors.red)
                         exit(1)
-                    puts("Executing prebuilder to creating VMs base image", color=colors.yellow)
+                    puts("Executing prebuilder to create VMs' base image", color=colors.yellow)
                     if not build_prebuilt():
                         puts("Error building prebuilt image", color=colors.red)
                         exit(1)
-                    puts("Creating base VM image (this action takes time and gives no output)", color=colors.yellow)
+                    puts("Creating base VM image (this action can take a while and produces no output)", color=colors.yellow)
                     if not commit_prebuilt():
                         puts("Error commiting prebuilt image", color=colors.red)
                         exit(1)
