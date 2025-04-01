@@ -675,6 +675,8 @@ def main():
                 if check_already_running():
                     puts(f"{g.name} is running! please stop it before clearing the data", color=colors.red)
                     exit(1)
+                if not any(vars(args).values()):
+                    clear_data(remove_config=False)
                 if args.all:
                     puts("This will clear everything, EVEN THE CONFIG JSON, are you sure? (y/N): ", end="")
                     if input().lower() != 'y':
