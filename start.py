@@ -754,7 +754,7 @@ def main():
                 if args.all:
                     puts("This will clear everything, EVEN THE CONFIG JSON, are you sure? (y/N): ", end="")
                     if input().lower() != 'y':
-                        break
+                        return
                     puts("Clearing everything (even config!!)", color=colors.yellow)
                     clear_data()
                 if args.config:
