@@ -6,6 +6,8 @@
 - Infrastructure
 - System
 
+**The infrastruture has the same model of <a href="https://ad.cyberchallenge.it/rules">CyberChallenge A/D infrastructure</a> created by <a href="https://cybersecnatlab.it/">CINI Cybersecurity National Lab</a>: also the rules and the network schema are taken from there. The sample services are a copy of a [CyberChallenge A/D Demo](https://github.com/CybersecNatLab/CybersecNatLab-AD-Demo).**
+
 ## Introduction
 Oasis is an open-source project designed to provide a simple and robust infrastructure for attack and defense simulations. It facilitates cybersecurity training and testing through various components and services.
 
